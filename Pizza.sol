@@ -149,6 +149,7 @@ contract Pizzeria {
         roles[msg.sender] = Roles.user;
     }
 
+
     // Выход из аккаунта
     function exit() public onlyUser {
         roles[msg.sender] = Roles.None;
