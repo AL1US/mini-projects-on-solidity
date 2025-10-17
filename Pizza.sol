@@ -131,6 +131,21 @@ contract Pizzeria {
     
     }
 
+    // Напитка
+    function buyPizza(uint256 _id) public payable onlyUser {
+        require(msg.value >= pizza[_id].price, "not enough eth sent");
+        require(_id < drinc.length, "There is no such pizza");
+
+        uint priceDrinc = drinc[_id].price;
+
+        if (msg.value > priceDrinc) {
+            payable(msg.sender).transfer(msg.value - priceDrinc);
+        }
+
+        payable(owner).transfer(priceDrinc);
+    
+    }
+
     // function setPizzaInBasket(uint256 _id) public {
     //     require(_id < pizza.length, "There is no such pizza");
 
