@@ -66,7 +66,7 @@ contract Pizzeria {
     }
 
     modifier onlyUser(){
-        require(roles[msg.sender] == Roles.user, "Access is denied: only the user can perform this action.");
+        require(roles[msg.sender] != Roles.None, "Access is denied: only the user can perform this action.");
         _;
     }
      
@@ -201,22 +201,23 @@ contract Pizzeria {
 
     // Покупка всей корзины
     function buyBasket() public payable onlyUser {
-        uint256 totalPrice = 0;
-
-        require(msg.value >= totalPrice, "Not enough money");
         require(basket[msg.sender].length > 0, "Basket is empty");
+
+        uint256 totalPrice = 0;
     
 
         for (uint256 i = 0; i < basket[msg.sender].length; i++) {
             totalPrice += basket[msg.sender][i].price * basket[msg.sender][i].quantity;
         }
 
-        if (msg.value > totalPrice) {
-            payable(msg.sender).transfer(msg.value - totalPrice);
-        }
+        require(msg.value >= totalPrice, "Not enough money");
 
         payable(owner).transfer(totalPrice);
 
+        if (msg.value > totalPrice) {
+            payable(msg.sender).transfer(msg.value - totalPrice);
+        }
+        
         delete basket[msg.sender];
     }
 
