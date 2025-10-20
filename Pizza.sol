@@ -234,6 +234,17 @@ contract Pizzeria {
         delete basket[msg.sender];
     }
 
+    // Просмотр корзины
+    function getBasket() public view returns (basketStruct[] memory) {
+        return basket[msg.sender];
+    }
+
+    // Просмотр чека
+    function getCheque() public view returns (basketStruct[][] memory) {
+        return cheque[msg.sender];
+    }
+    
+
     // Удаление продукта из корзины
     function delProduct(uint256 _element) public  onlyUser {
         require(_element < basket[msg.sender].length, "There is no such element");  
