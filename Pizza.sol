@@ -230,6 +230,11 @@ contract Pizzeria {
         basket[msg.sender].pop();
     }
 
+    // Функция показа корзины
+    function showBasket() public view onlyUser returns (basketStruct[] memory) {
+        return basket[msg.sender];
+    }
+
     // Функции админа
     function setManager(address _address) public onlyAdmin {
         roles[_address] = Roles.manager;
