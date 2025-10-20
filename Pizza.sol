@@ -96,7 +96,6 @@ contract Pizzeria {
     } 
 
     // функции менеджера 
-
     //Создание, удаление пицц и просмотр пицц
     function setPizza(string memory _name, string memory _description, uint256 _price) public onlyManager{
         uint ID = pizza.length + 1;
