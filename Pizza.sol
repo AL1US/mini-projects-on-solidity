@@ -44,6 +44,17 @@ contract Pizzeria {
         string password;
     }    
 
+    mapping (address => basketStruct[][]) public cheque;
+
+    // mapping (address => chequeStruct[]) public cheque;
+
+    // struct chequeStruct {
+    //     uint256 id;
+    //     address ownerCheque;
+    //     basketStruct[] products;
+    //     uint256 totalPrice;
+    // }
+
     mapping (address => basketStruct[]) public basket;
 
     struct basketStruct {
@@ -218,6 +229,8 @@ contract Pizzeria {
         if (msg.value > totalPrice) {
             payable(msg.sender).transfer(msg.value - totalPrice);
         }
+
+        cheque[msg.sender].push(basket[msg.sender]);
 
         delete basket[msg.sender];
     }
