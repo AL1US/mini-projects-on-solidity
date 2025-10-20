@@ -28,8 +28,6 @@ contract Pizzeria {
         uint256 price;
     }
 
-    // basketPizza[] public basketPizza;
-
     drincStruct[] public drinc;
 
      struct drincStruct {
@@ -44,9 +42,22 @@ contract Pizzeria {
     struct regStruct {
         string login;
         string password;
+    }    
+
+
+    mapping (address => basketStruct[]) public basket;
+
+    struct basketStruct {
+        uint256 id;
+        ProductType productType;
+        uint256 quantity;
+        uint256 price;
     }
 
-
+    enum ProductType {
+        pizza,
+        drinc
+    }
 
     // Модификаторы
     modifier onlyAdmin(){
@@ -82,10 +93,6 @@ contract Pizzeria {
         pizza.push(pizzaStruct(ID, _name, _description, _price));
     }
 
-    // function pushInBasketPizza (uint _IndexPizza) public onlyUser {
-    //     basketPizza.push(pizza[_IndexPizza]);
-    // }
-
     function getPizza(uint256 _index) public view returns(pizzaStruct memory) {
         return pizza[_index]; 
     }
@@ -95,7 +102,6 @@ contract Pizzeria {
         pizza[_element] = pizza[pizza.length -1];
         pizza.pop();
     }
-    
 
     // Создание, удаление напитков и просмотр напитков
     function setDrinc(string memory _name, string memory _description, uint256 _price) public onlyManager{
@@ -116,7 +122,7 @@ contract Pizzeria {
         
     // Функции юзера
 
-    // Покупка пиццы
+    // Функции с пиццей
     function buyPizza(uint256 _id) public payable onlyUser {
         require(msg.value >= pizza[_id].price, "not enough eth sent");
         require(_id < pizza.length, "There is no such pizza");
@@ -131,10 +137,33 @@ contract Pizzeria {
     
     }
 
-    // Напитка
+    function setPizzaInBasket(uint256 _index, uint256 _quanity ) public onlyUser {
+        require(_index < pizza.length, "There is no such pizza");
+        require(_quanity > 0, "Quantity of pizza must be greater than 0");
+        require(_quanity < 100, "Quantity of pizza must be less than 100");
+
+        bool alreadyInBasket = false;
+        uint256 indexInBasket;
+
+        for (uint256 i = 0; i < basket[msg.sender].length; i++) {
+            if (basket[msg.sender][i].id == _index && basket[msg.sender][i].productType == ProductType.pizza) {
+                alreadyInBasket = true;
+                indexInBasket = i;
+                break;
+            }
+        }
+
+        if (alreadyInBasket) {
+            basket[msg.sender][indexInBasket].quantity += _quanity;
+        } else {
+            basket[msg.sender].push(basketStruct(pizza[_index].id, ProductType.pizza, _quanity, pizza[_index].price));
+        }
+    }
+
+    // Функции с напитком
     function buyDrinc(uint256 _id) public payable onlyUser {
-        require(msg.value >= pizza[_id].price, "not enough eth sent");
-        require(_id < drinc.length, "There is no such pizza");
+        require(msg.value >= drinc[_id].price, "not enough eth sent");
+        require(_id < drinc.length, "There is no such drinc");
 
         uint priceDrinc = drinc[_id].price;
 
@@ -146,12 +175,54 @@ contract Pizzeria {
     
     }
 
-    // function setPizzaInBasket(uint256 _id) public {
-    //     require(_id < pizza.length, "There is no such pizza");
+    function setDrincInBasket(uint256 _index, uint256 _quanity ) public onlyUser {
+        require(_index < drinc.length, "There is no such pizza");
+        require(_quanity > 0, "Quantity of drinc must be greater than 0");
+        require(_quanity < 100, "Quantity of drinc must be less than 100");
 
-    //     basket.push(pizzaStruct(pizza[_id].name, pizza[_id].price));
-    // }  
+        bool alreadyInBasket = false;
+        uint256 indexInBasket;
 
+        for (uint256 i = 0; i < basket[msg.sender].length; i++) {
+            if (basket[msg.sender][i].id == _index && basket[msg.sender][i].productType == ProductType.drinc) {
+                alreadyInBasket = true;
+                indexInBasket = i;
+                break;
+            }
+        }
+
+        if (alreadyInBasket) {
+            basket[msg.sender][indexInBasket].quantity += _quanity;
+        } else {
+
+        basket[msg.sender].push(basketStruct(drinc[_index].id, ProductType.drinc, _quanity, drinc[_index].price));
+        }
+    }
+
+    // Покупка всей корзины
+    function buyBasket() public payable onlyUser {
+        uint256 totalPrice = 0;
+
+        require(msg.value >= totalPrice, "Not enough money");
+        require(basket[msg.sender].length > 0, "Basket is empty");
+    
+
+        for (uint256 i = 0; i < basket[msg.sender].length; i++) {
+            totalPrice += basket[msg.sender][i].price * basket[msg.sender][i].quantity;
+        }
+
+        if (msg.value > totalPrice) {
+            payable(msg.sender).transfer(msg.value - totalPrice);
+        }
+
+        payable(owner).transfer(totalPrice);
+
+        delete basket[msg.sender];
+    }
+
+    // Удаление продукта из корзины
+
+    
 
     // Функции админа
     function setManager(address _address) public onlyAdmin {
@@ -163,7 +234,6 @@ contract Pizzeria {
         registration[msg.sender] = regStruct(_login, _password);
         roles[msg.sender] = Roles.user;
     }
-
 
     // Выход из аккаунта
     function exit() public onlyUser {
