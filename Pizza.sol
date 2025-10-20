@@ -221,8 +221,14 @@ contract Pizzeria {
     }
 
     // Удаление продукта из корзины
+    function delProduct(uint256 _element) public  onlyUser {
+        require(_element < basket[msg.sender].length, "There is no such element");  
+        require(basket[msg.sender].length > 0, "Basket is empty");
+        require(basket[msg.sender][_element].quantity >= 1, "Quantity is 0");
 
-    
+        basket[msg.sender][_element] = basket[msg.sender][basket[msg.sender].length -1];
+        basket[msg.sender].pop();
+    }
 
     // Функции админа
     function setManager(address _address) public onlyAdmin {
