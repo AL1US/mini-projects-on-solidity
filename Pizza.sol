@@ -44,12 +44,12 @@ contract Pizzeria {
         string password;
     }    
 
-
     mapping (address => basketStruct[]) public basket;
 
     struct basketStruct {
         uint256 id;
         ProductType productType;
+        string name;
         uint256 quantity;
         uint256 price;
     }
@@ -137,6 +137,7 @@ contract Pizzeria {
     
     }
 
+    // Добавить пиццу в корзину
     function setPizzaInBasket(uint256 _index, uint256 _quanity ) public onlyUser {
         require(_index < pizza.length, "There is no such pizza");
         require(_quanity > 0, "Quantity of pizza must be greater than 0");
@@ -156,7 +157,7 @@ contract Pizzeria {
         if (alreadyInBasket) {
             basket[msg.sender][indexInBasket].quantity += _quanity;
         } else {
-            basket[msg.sender].push(basketStruct(pizza[_index].id, ProductType.pizza, _quanity, pizza[_index].price));
+            basket[msg.sender].push(basketStruct(pizza[_index].id, ProductType.pizza, pizza[_index].name, _quanity, pizza[_index].price));
         }
     }
 
@@ -175,6 +176,7 @@ contract Pizzeria {
     
     }
 
+    // Добавить напиток в корзину
     function setDrincInBasket(uint256 _index, uint256 _quanity ) public onlyUser {
         require(_index < drinc.length, "There is no such pizza");
         require(_quanity > 0, "Quantity of drinc must be greater than 0");
@@ -195,7 +197,7 @@ contract Pizzeria {
             basket[msg.sender][indexInBasket].quantity += _quanity;
         } else {
 
-        basket[msg.sender].push(basketStruct(drinc[_index].id, ProductType.drinc, _quanity, drinc[_index].price));
+        basket[msg.sender].push(basketStruct(drinc[_index].id, ProductType.drinc, drinc[_index].name, _quanity, drinc[_index].price));
         }
     }
 
@@ -205,7 +207,6 @@ contract Pizzeria {
 
         uint256 totalPrice = 0;
     
-
         for (uint256 i = 0; i < basket[msg.sender].length; i++) {
             totalPrice += basket[msg.sender][i].price * basket[msg.sender][i].quantity;
         }
@@ -217,7 +218,7 @@ contract Pizzeria {
         if (msg.value > totalPrice) {
             payable(msg.sender).transfer(msg.value - totalPrice);
         }
-        
+
         delete basket[msg.sender];
     }
 
@@ -225,10 +226,14 @@ contract Pizzeria {
     function delProduct(uint256 _element) public  onlyUser {
         require(_element < basket[msg.sender].length, "There is no such element");  
         require(basket[msg.sender].length > 0, "Basket is empty");
-        require(basket[msg.sender][_element].quantity >= 1, "Quantity is 0");
 
         basket[msg.sender][_element] = basket[msg.sender][basket[msg.sender].length -1];
         basket[msg.sender].pop();
+    }
+
+    // Очистка всей корзины
+    function clearBasket() public onlyUser {
+        delete basket[msg.sender];
     }
 
     // Функция показа корзины
