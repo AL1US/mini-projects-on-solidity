@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-contract Pizzeria {
+contract Contract {
 
     address owner;
 
     mapping (address => Roles) public roles;
 
-/** 
- *  Почему enum, а не struct?
- *  в enum операции намного дешевле чем в структуре
- *  Также проверки намного проще осуществляются
- */
     enum Roles {
         None, // Для проверки того, что пользователь не имеет роли
         user,
@@ -23,6 +18,7 @@ contract Pizzeria {
 
     struct pizzaStruct {
         uint256 id;
+        string url_img;
         string name;
         string description;
         uint256 price;
@@ -32,6 +28,7 @@ contract Pizzeria {
 
      struct drincStruct {
          uint256 id;
+         string url_img;
          string name;
          string description;
          uint256 price;
@@ -45,15 +42,6 @@ contract Pizzeria {
     }    
 
     mapping (address => basketStruct[][]) public cheque;
-
-    // mapping (address => chequeStruct[]) public cheque;
-
-    // struct chequeStruct {
-    //     uint256 id;
-    //     address ownerCheque;
-    //     basketStruct[] products;
-    //     uint256 totalPrice;
-    // }
 
     mapping (address => basketStruct[]) public basket;
 
@@ -97,15 +85,20 @@ contract Pizzeria {
 
     // функции менеджера 
     //Создание, удаление пицц и просмотр пицц
-    function setPizza(string memory _name, string memory _description, uint256 _price) public onlyManager{
+    function setPizza(string memory _url_img ,string memory _name, string memory _description, uint256 _price) public onlyManager{
         uint ID = pizza.length + 1;
 
-        pizza.push(pizzaStruct(ID, _name, _description, _price));
+        pizza.push(pizzaStruct(ID, _url_img, _name, _description, _price));
     }
 
     function getPizza(uint256 _index) public view returns(pizzaStruct memory) {
         return pizza[_index]; 
     }
+
+    function getAllPizzas() public view returns (pizzaStruct[] memory) {
+        return pizza;
+    }
+
 
     function delPizza(uint256 _element) public  onlyManager {
         require(_element < pizza.length, "There is no such element");  
@@ -114,10 +107,10 @@ contract Pizzeria {
     }
 
     // Создание, удаление напитков и просмотр напитков
-    function setDrinc(string memory _name, string memory _description, uint256 _price) public onlyManager{
+    function setDrinc(string memory _url_img, string memory _name, string memory _description, uint256 _price) public onlyManager{
         uint ID = drinc.length + 1;
 
-        drinc.push(drincStruct(ID, _name, _description, _price));
+        drinc.push(drincStruct(ID, _url_img, _name, _description, _price));
     }    
 
     function getDrinc(uint256 _index) public view returns (drincStruct memory) {
@@ -274,6 +267,28 @@ contract Pizzeria {
         registration[msg.sender] = regStruct(_login, _password);
         roles[msg.sender] = Roles.user;
     }
+
+    function sign(address userAddress, string memory _password) public returns (bool) {
+    require(userAddress == msg.sender, "Address mismatch with sender");
+
+        if (userAddress == owner) {
+        return true;
+    }
+    
+    regStruct memory userData = registration[userAddress];
+        require(bytes(userData.password).length > 0, "there is no registered user with this address.");
+        require(compareStrings(userData.password, _password), "incorrect password");
+
+        if (roles[userAddress] == Roles.None) {
+            roles[userAddress] = Roles.user;
+        }
+
+        return true;
+        }
+
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+        }
 
     // Выход из аккаунта
     function exit() public onlyUser {
