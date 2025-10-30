@@ -204,6 +204,14 @@ contract Contract {
         }
     }
 
+    function getBasketTotal(address user) public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < basket[user].length; i++) {
+            total += basket[user][i].price * basket[user][i].quantity;
+        }
+        return total;
+    }
+
     // Покупка всей корзины
     function buyBasket() public payable onlyUser {
         require(basket[msg.sender].length > 0, "Basket is empty");
