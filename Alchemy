@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+contract Contract {
+
+    // Переменные
+    address owner;
+
+    uint256 counter;
+
+
+    // Мапинги
+    mapping(address => uint256) public tokens;
+
+    mapping(address => structMyElement) public element;
+
+
+    // Структуры и массивы структур
+    struct structMyElement {
+        uint256 id;
+        string name;
+        uint256 price;
+        uint256 quanity;
+    }
+
+    structStore[] public store;
+
+    struct structStore {
+        uint256 id;
+        string name;
+        uint256 price;
+    }
+
+
+    // Модификаторы
+    modifier onlyOwner {
+        require(msg.sender == owner, "You are not owner");
+        _;
+    }
+
+    // Конструктор
+    constructor() {
+        owner = msg.sender;
+    }
+
+
+    // set функции
+    function setProduct(string memory _name, uint256 _price) public onlyOwner(){
+        uint256 _id;
+        _id ++;
+        
+        store.push(structStore(_id, _name, _price));
+    }
+
+    function setCounter() public {
+        if (counter < 10){
+            counter++;
+        } else {
+            counter = 0;
+            tokens[msg.sender] += 1;
+        }
+
+    }
+
+    // get функции
+    
+    // get для переменных
+    function getToken() public view returns(uint256) {
+        return tokens[msg.sender];
+    }
+
+    function getCounter() public view returns(uint256) {
+        return counter;
+    }
+
+        function getOwner() public view returns(address) {
+        return owner;
+    }
+    
+
+    // get для мапингов и прочее
+
+    // Просмотр количества элементов 
+    function getElQuanity() public view returns(uint256) {
+        return store.length;
+    }
+
+    // Просмотр элемента по индексу в массиве
+    function getElIndex(uint256 _index) public view returns(structStore memory) {
+        return store[_index];
+    }
+
+    
+
+}
