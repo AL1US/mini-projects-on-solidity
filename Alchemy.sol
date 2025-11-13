@@ -20,6 +20,8 @@ contract Xcoin is ERC20, ERC1155 {
         ["air", "100", "common"]
         ];
 
+    structStoreUsers[] public store;
+
     // Структуры
     struct structElement {
         string name;
@@ -33,13 +35,14 @@ contract Xcoin is ERC20, ERC1155 {
         string name;
         uint256 price;
         string rarity;
+        uint256 amount;
     }
 
 
     // Мапинги
     mapping (address => structElement[]) public userElements;
 
-    mapping (uint256 => structStoreUsers[]) public store;
+    // mapping (uint256 => structStoreUsers[]) public store;
     
 
 
@@ -91,17 +94,20 @@ contract Xcoin is ERC20, ERC1155 {
         _transfer(address(this), msg.sender, 10);
     }
 
-    // fuction addTokenInStore(uint256 _price, uint256 _amount) public {
-    //     // Проверка на то хватает ли токенов
+    function addTokenInStore(uint256 _price, uint256 _amount, uint256 _index) public {
+        // Проверка на то хватает ли токенов
 
-    //     store.push(structStoreUsers(
-    //         msg.sender,
-    //         // имя
-    //         _price,
-    //         // Редкость
-    //     ));
+        store.push(structStoreUsers(
+            msg.sender,
+            arrayBaseElement[_index][0],
+            _price,
+            arrayBaseElement[_index][2],
+            _amount
+        ));
         
-    // }
+        // Счетчик amount для кода снизу
+        // Код, который удаляет токен если всё раскупили
+    }
 
     // Геттеры
     function getAllElements() public view returns(string[] memory){
