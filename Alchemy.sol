@@ -109,8 +109,6 @@ contract Xcoin is ERC20, ERC1155 {
             _amount
         ));
         
-        // Счетчик amount для кода снизу
-        // Код, который удаляет токен если всё раскупили
     }
 
     function buyTokenInStore(uint256 _index, uint256 _amount) public payable {
@@ -124,6 +122,9 @@ contract Xcoin is ERC20, ERC1155 {
         transfer(addressOwnerToken, priceToken);
 
         safeTransferFrom(addressOwnerToken, msg.sender, _index, _amount, data);
+
+        // Счетчикяя amount для кода снизу
+        // Код, который удаляет токен если всё раскупили
     }
 
     // Геттеры
