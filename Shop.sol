@@ -1,63 +1,130 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-contract Basics {
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 
-    Data[] public products;
+contract Xcoin is ERC20, ERC1155 {
 
-    mapping(address => uint256) public mapBuyProduct; 
+    //  Переменные
+    address Owner;
+    
+    uint256 public unicueElement;
 
-    modifier noElement(uint256 _element) {
-        require(_element < products.length, "There is no such element");
-        _;
+    string[] public allBaseElement=["water --> 0", "fire --> 1", "ground --> 2","air -->3"];
+
+    string[][] public arrayBaseElement=[
+        ["water", "100", "common"], 
+        ["fire", "100", "common"],
+        ["ground", "100", "common"],
+        ["air", "100", "common"]
+        ];
+
+    structStoreUsers[] public store;
+
+    // Структуры
+    struct structElement {
+        string name;
+        uint256 price; 
+        string rarity; // на самом деле редкость тут чисто по приколу
+        uint256 amount;
     }
 
-    struct Data {
+    struct structStoreUsers {
         address ownerProduct;
         string name;
         uint256 price;
-        bool state;
+        string rarity;
+        uint256 amount;
     }
 
-    function pushProduct(address _ownerProduct, string memory _name, uint256 _price, bool _state) public {
-        products.push(Data(_ownerProduct,_name, _price, _state));
-    }
- 
-    function delProduct(uint256 _element) public noElement(_element) {
 
-        require(msg.sender == products[_element].ownerProduct, "Only owner can delete");
-   
-        products[_element] = products[products.length -1];
-        products.pop();
-    }
+    // Мапинги
+    mapping (address => structElement[]) public userElements;
 
-    function getProduct(uint256 _numProduct) public view returns(
-        address ownerProduct,
-        string memory name,
-        uint256 price,
-        bool state
-    ) {
-        return (products[_numProduct].ownerProduct, products[_numProduct].name, products[_numProduct].price, products[_numProduct].state);
+    // mapping (uint256 => structStoreUsers[]) public store;
+    
+
+
+    // Модификаторы
+    modifier onlyOwner {
+        require(msg.sender == Owner, "You are not owner");
+        _;
     }
 
-    function getProduct1(uint256 _numProduct) public view returns(Data memory) {
-        return products[_numProduct];
+    // Сеттеры
+    function setElement(
+        uint256 _index,
+        uint256 amount) public payable {
+            require(_index <= 3, "Not found element"); //   Всего есть 4 базовых элемента от 0 до 3
+            uint256 price = 10;
+            // Проверка на то есть ли уже этот токен у юзера, если есть, то нужно просто добавить к нему количество
+            require(balanceOf(msg.sender) >= price * amount, "you dont have enough money" );
+
+            ERC1155._mint( 
+                msg.sender,
+                unicueElement,
+                amount,
+                ""
+            );
+
+            transfer(address(this), price);
+
+
+        // Если бы мы просто старались запушить по [_index], то у нас выдалобы ошибку, которая связана с тем, что
+        // мы по сути просто передадим массив строк, что передасться только в 1 поле структуры, а не по все другие, да и тип данных 
+        // там не правильный, поэтому оно впринципе нормально не передасться
+        // Сохраняем мы это всё для удобства, чтобы потом можно было нормально и красиво отабразить, хотя не знаю пригодится ли оно мне
+        userElements[msg.sender].push(
+            structElement(             
+                // Сначала обращаемся к массиву, затем к элементу массива
+                arrayBaseElement[_index][0], // Имя
+                price,
+                arrayBaseElement[_index][2], // Редкость
+                amount
+            )
+        );
+
+        unicueElement = _index; // Равно тому индексу, по которому мы добавили элемент
+
     }
 
-    function funcBuyProduct(uint256 _product) public payable noElement(_product) {
-        require(products[_product].state == true, "net atogo product");
-        require(msg.value >= products[_product].price, "not enough eth sent");
+    // Кликер для получения Xcoin
+    function setToken() public payable {
 
-        uint256 productPrice = products[_product].price;
+        _transfer(address(this), msg.sender, 10);
+    }
 
-        if(msg.value > productPrice) {
-            payable(msg.sender).transfer(msg.value - productPrice);
-        }
+    function addTokenInStore(uint256 _price, uint256 _amount, uint256 _index) public {
+        // Проверка на то хватает ли токенов
 
-        payable(products[_product].ownerProduct).transfer(productPrice);
+        store.push(structStoreUsers(
+            msg.sender,
+            arrayBaseElement[_index][0], // имя
+            _price,
+            arrayBaseElement[_index][2], // редкость
+            _amount
+        ));
         
-        mapBuyProduct[msg.sender] = _product;
-        products[_product].state = false;
+        // Счетчик amount для кода снизу
+        // Код, который удаляет токен если всё раскупили
+    }
 
-        }
+    // Геттеры
+    function getAllElements() public view returns(string[] memory){
+        return allBaseElement;
+    }
+
+    function getTokenInStore(uint256 _index) public view returns (structStoreUsers memory) {
+        return store[_index];
+    }
+    
+
+    // Консруктор
+    constructor(uint256 initialSupply) ERC20("Xcoin", "X") ERC1155("./Element/") {
+        _mint(msg.sender, initialSupply);
+        Owner = msg.sender;
+        // token = Erc20(address(this));
+    }
+
 }
