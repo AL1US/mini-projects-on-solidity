@@ -23,7 +23,15 @@ contract Xcoin is ERC20, ERC1155 {
     // Структуры
     struct structElement {
         string name;
-        string price; //Строка потому-что в массиве arrayBaseElement - у нас массив строк
+        uint256 price; 
+        string rarity;
+        uint256 amount;
+    }
+
+    struct structStoreUsers {
+        address ownerProduct;
+        string name;
+        uint256 price;
         string rarity;
     }
 
@@ -31,7 +39,7 @@ contract Xcoin is ERC20, ERC1155 {
     // Мапинги
     mapping (address => structElement[]) public userElements;
 
-    // mapping (address => uint256) public user_amount_unicue_nft;
+    mapping (uint256 => structStoreUsers[]) public store;
     
 
 
@@ -45,8 +53,10 @@ contract Xcoin is ERC20, ERC1155 {
     function setElement(
         uint256 _index,
         uint256 amount) public payable {
+            // Проверка на то есть ли уже этот токен у юзера, если есть, то нужно просто добавить к нему количество
+            require(balanceOf(msg.sender) >= 100 * amount, "you dont have enough money" );
 
-            require(balanceOf(msg.sender) >= 100, "you dont have enough money" );
+            uint256 price = 100;
 
             ERC1155._mint( 
                 msg.sender,
@@ -58,21 +68,22 @@ contract Xcoin is ERC20, ERC1155 {
             transfer(address(this), 100);
 
 
-// Если бы мы просто старались запушить по [_index], то у нас выдалобы ошибку, которая связана с тем, что
-// мы по сути просто передадим массив строк, что передасться только в 1 поле структуры, а не по все другие, да и тип данныых 
-// там не правильный, поэтому оно впринципе нормально не передасться
-
+        // Если бы мы просто старались запушить по [_index], то у нас выдалобы ошибку, которая связана с тем, что
+        // мы по сути просто передадим массив строк, что передасться только в 1 поле структуры, а не по все другие, да и тип данныых 
+        // там не правильный, поэтому оно впринципе нормально не передасться
+        // Сохраняем мы это всё для удобства, чтобы потом можно было нормально и красиво отабразить, хотя не знаю пригодится ли оно мне
         userElements[msg.sender].push(
             structElement(             
-                arrayBaseElement[_index][0], // Сначала обращаемся к массиву, затем к элементу массива
-                arrayBaseElement[_index][1],
-                arrayBaseElement[_index][2]
+                // Сначала обращаемся к массиву, затем к элементу массива
+                arrayBaseElement[_index][0], // Имя
+                price,
+                arrayBaseElement[_index][2], // Редкость
+                amount
             )
         );
 
-        unicueElement ++;
+        unicueElement = _index; // Равно тому индексу, по которому мы добавили элемент
 
-        // user_amount_unicue_nft[msg.sender] ++;
     }
 
     function setToken() public payable {
@@ -80,8 +91,19 @@ contract Xcoin is ERC20, ERC1155 {
         _transfer(address(this), msg.sender, 10);
     }
 
-    // Геттеры
+    // fuction addTokenInStore(uint256 _price, uint256 _amount) public {
+    //     // Проверка на то хватает ли токенов
 
+    //     store.push(structStoreUsers(
+    //         msg.sender,
+    //         // имя
+    //         _price,
+    //         // Редкость
+    //     ));
+        
+    // }
+
+    // Геттеры
     function getAllElements() public view returns(string[] memory){
         return allBaseElement;
     }
