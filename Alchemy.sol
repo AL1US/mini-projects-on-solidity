@@ -22,6 +22,8 @@ contract Xcoin is ERC20, ERC1155 {
 
     structStoreUsers[] public store;
 
+    uint256 public constant INITIAL_SUPPLY = 1_000_000 * 10**18;
+
     // Структуры
     struct structElement {
         string name;
@@ -135,10 +137,10 @@ contract Xcoin is ERC20, ERC1155 {
     
 
     // Консруктор
-    constructor(uint256 initialSupply) ERC20("Xcoin", "X") ERC1155("./Element/") {
-        _mint(msg.sender, initialSupply);
+    constructor() ERC20("Xcoin", "X") ERC1155("./Element/") {
         Owner = msg.sender;
-        // token = Erc20(address(this));
+        _mint(address(this), INITIAL_SUPPLY); // Указывается то кому будут переведены токены и то сколько будет токенов
+
     }
 
 }
