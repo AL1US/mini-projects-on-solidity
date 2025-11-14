@@ -11,7 +11,7 @@ contract Xcoin is ERC20, ERC1155 {
     
     uint256 public unicueElement;
 
-    string[] public allBaseElement=["water --> 0", "fire --> 1", "ground --> 2","air -->3"];
+    string[] public allBaseElement=["water --> 0", "fire --> 1", "ground --> 2", "air -->3"];
 
     string[][] public arrayBaseElement=[
         ["water", "100", "common"], 
@@ -38,6 +38,7 @@ contract Xcoin is ERC20, ERC1155 {
         uint256 price;
         string rarity;
         uint256 amount;
+        // uint256 id;
     }
 
 
@@ -70,7 +71,7 @@ contract Xcoin is ERC20, ERC1155 {
                 ""
             );
 
-            transfer(address(this), price);
+            transfer(Owner, price * amount);
 
 
         // Если бы мы просто старались запушить по [_index], то у нас выдалобы ошибку, которая связана с тем, что
@@ -117,14 +118,19 @@ contract Xcoin is ERC20, ERC1155 {
         address addressOwnerToken = store[_index].ownerToken;
         bytes memory data = "";
 
+        require(balanceOf(addressOwnerToken, _index) >= _amount);
         require(balanceOf(msg.sender) >= priceToken, "Not enough Xcoin"); 
 
         transfer(addressOwnerToken, priceToken);
 
         safeTransferFrom(addressOwnerToken, msg.sender, _index, _amount, data);
 
-        // Счетчикяя amount для кода снизу
-        // Код, который удаляет токен если всё раскупили
+        store[_index].amount -= _amount;
+
+        if (store[_index].amount == 0) {
+            store[_index] = store[store.length -1];
+            store.pop();
+        }
     }
 
     // Геттеры
