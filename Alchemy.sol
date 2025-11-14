@@ -38,7 +38,6 @@ contract Xcoin is ERC20, ERC1155 {
         uint256 price;
         string rarity;
         uint256 amount;
-        // uint256 id;
     }
 
 
@@ -71,7 +70,7 @@ contract Xcoin is ERC20, ERC1155 {
                 ""
             );
 
-            transfer(Owner, price * amount);
+            transfer(address(this), price * amount);
 
 
         // Если бы мы просто старались запушить по [_index], то у нас выдалобы ошибку, которая связана с тем, что
