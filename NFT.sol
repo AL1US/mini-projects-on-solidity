@@ -62,8 +62,8 @@ contract Xcoin is ERC20, ERC1155 {
     mapping (uint256 => structNFT) public NFT;
     mapping (uint256 => structCollection) public collectionNFT;
 
-    mapping (address => structNFT[]) public userNFT;
-    mapping (address => structCollection[]) public userCollectionNFT;
+    mapping (address => structNFT[]) public userNFTs;
+    mapping (address => structCollection[]) public userCollectionsNFTs;
 
     mapping (address => structUser) public user;
 
@@ -78,6 +78,27 @@ contract Xcoin is ERC20, ERC1155 {
         _user = user[msg.sender];
         _balance = balanceOf(msg.sender);
     } 
+
+    function getNFTUser(address _addressOwnerNFT, uint256 _index) public view returns(structNFT memory) {
+
+        structNFT[] memory userTokens = userNFTs[_addressOwnerNFT];
+
+        require(_index < userTokens.length, "Not found this NFT");
+
+        return userTokens[_index];
+    }
+
+    function getMyAllNFT() public view returns(structNFT[] memory) {
+        return userNFTs[msg.sender];
+    }
+
+    function getMyNFTForIndex(uint256 _index) public view returns(structNFT memory) {
+        structNFT[] memory myNFT = userNFTs[msg.sender];
+
+        require(_index < myNFT.length, "Not found this NFT");
+
+        return myNFT[_index];
+    }
 
 
     function setNFT(
@@ -94,7 +115,9 @@ contract Xcoin is ERC20, ERC1155 {
             ""
         );
 
-        userNFT[msg.sender].push(structNFT(
+        unicueNFT ++;
+
+        userNFTs[msg.sender].push(structNFT(
             unicueNFT,
             _name,
             _description,
@@ -107,10 +130,10 @@ contract Xcoin is ERC20, ERC1155 {
     }
 
 
-  constructor() ERC20("Xcoin", "X") ERC1155("./images/") {
+    constructor() ERC20("Xcoin", "X") ERC1155("./images/") {
 
-        ERC20._mint(owner, 1000000);
-
+        owner = msg.sender;
+        ERC20._mint(owner, 1000_000_000);
         user[owner] = structUser("Owner", "XCoinReferal31415", 0);
 
         // hardhat
@@ -124,13 +147,13 @@ contract Xcoin is ERC20, ERC1155 {
         // ERC20._transfer(owner, 0x90F79bf6EB2c4f870365E785982E1f101E93b906, 400000);
 
         // remix
-        user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser("Tom", "PROFI4B202024", 0);
         ERC20._transfer(owner, 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2, 200_000);
 
         user[0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db] = structUser("Max", "PROFI78732024", 0);
         ERC20._transfer(owner, 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db, 300_000);
 
         user[0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB] = structUser("Jack", "PROFI617F2024", 0);
+        user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser("Tom", "PROFI4B202024", 0);
         ERC20._transfer(owner, 0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB, 400_000);
     }
 
