@@ -9,10 +9,14 @@ contract Xcoin is ERC20, ERC1155 {
 
     address owner;
 
+    uint public unicueNFT;
+    uint public unicueCollection; 
+
     uint256 public constant INITIAL_SUPPLY = 1_000_000 * 10**18;
 
     structNFT[] public storeNFT;
     structCollection[] public storeCollectionNFT;
+
 
     struct structNFT {
         uint256 id;
@@ -21,6 +25,7 @@ contract Xcoin is ERC20, ERC1155 {
         string imgPath;
         uint256 price;
         uint256 quanity;
+        bool state;
         uint256 creationDate;
     }
 
@@ -30,6 +35,7 @@ contract Xcoin is ERC20, ERC1155 {
         string description;
         uint256 price;
         structNFT[] NFTInCollection;
+        bool state;
         uint256 creationDate;
     }
 
@@ -52,13 +58,54 @@ contract Xcoin is ERC20, ERC1155 {
         uint256 timeEnd;
     }
 
+
     mapping (uint256 => structNFT) public NFT;
     mapping (uint256 => structCollection) public collectionNFT;
 
     mapping (address => structNFT[]) public userNFT;
-    mapping (address => structCollection[]) public userCollection;
+    mapping (address => structCollection[]) public userCollectionNFT;
 
     mapping (address => structUser) public user;
+
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "You are not owner");
+        _;
+    }
+
+
+    function getProfile() public view returns(structUser memory _user, uint256 _balance) {
+        _user = user[msg.sender];
+        _balance = balanceOf(msg.sender);
+    } 
+
+
+    function setNFT(
+        string memory _name,
+        string memory _description,
+        string memory _imgPath,
+        uint256 _amount
+        ) public onlyOwner {
+
+        _mint(
+            msg.sender,
+            unicueNFT,
+            _amount,
+            ""
+        );
+
+        userNFT[msg.sender].push(structNFT(
+            unicueNFT,
+            _name,
+            _description,
+            _imgPath,
+            0, // Цена указывается после того, как нфт идёт в продажу 
+            _amount,
+            false,
+            block.timestamp
+        ));
+    }
+
 
   constructor() ERC20("Xcoin", "X") ERC1155("./images/") {
 
@@ -66,6 +113,7 @@ contract Xcoin is ERC20, ERC1155 {
 
         user[owner] = structUser("Owner", "XCoinReferal31415", 0);
 
+        // hardhat
         // user[0x70997970C51812dc3A010C7d01b50e0d17dc79C8] = structUser("Tom", "PROFI3C442024", 0);
         // ERC20._transfer(owner, 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, 200000);
 
