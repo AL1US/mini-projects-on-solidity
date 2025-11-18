@@ -35,7 +35,6 @@ contract Xcoin is ERC20, ERC1155 {
         string description;
         uint256 price;
         uint256[] NFTInCollection;
-        uint256[] amountNFTInCollection;
         bool state;
         uint256 creationDate;
     }
@@ -150,13 +149,13 @@ contract Xcoin is ERC20, ERC1155 {
 
     // Сеттер на коллекцию
     function setCollection(string memory _name, string memory _description) public {
+
         collectionNFTs[unicueCollectionNFT] = structCollectionNFT(
             unicueCollectionNFT,
             _name,
             _description,
             0,
-            new uint[](0),
-            new uint[](0),
+            new uint256[](0),
             false,
             block.timestamp
         );
