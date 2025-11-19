@@ -165,6 +165,17 @@ contract Xcoin is ERC20, ERC1155 {
         unicueCollectionNFT ++;
     }
 
+    //  Сеттер на добавление NFT в коллекцию
+    function setNFTInCollection(uint256 _unicueCollectionNFT, uint256 _unicueNFT) public {
+        require(owner_collection[_unicueCollectionNFT] == msg.sender, "You are not owner this collection");
+        // Проверка на то есть ли такие нфт у юзера
+        // Проверка на то хватает ли таких нфт у юзера
+
+        structCollectionNFT storage myCollection = collectionNFTs[_unicueCollectionNFT];
+
+        myCollection.NFTInCollection.push(_unicueNFT);
+    }
+
     constructor() ERC20("Xcoin", "X") ERC1155("./images/") {
 
         owner = msg.sender;
