@@ -28,6 +28,7 @@ contract Xcoin is ERC20, ERC1155 {
     // Структура, для того чтобы можно было только по id и количеству помещать NFT в магазин, коллекцию или аукцион
     struct structNFTsInSomething {
         uint256 id;
+        address owner;
         uint256 amount;
         uint256 price; // При добавлении в коллекцию не указывается, только если мы добавляем в магазин
     }
@@ -154,8 +155,6 @@ contract Xcoin is ERC20, ERC1155 {
     ) public onlyOwner {
         _mint(msg.sender, unicueNFT, _amount, "");
 
-        unicueNFT++;
-
         // Пуш в мапинг нфт, которыми владеет юзер
         userNFTs[msg.sender].push(
             structNFT(
@@ -179,6 +178,8 @@ contract Xcoin is ERC20, ERC1155 {
             _amount,
             block.timestamp
         );
+
+        unicueNFT++;
     }
 
     // Сеттер на коллекцию
@@ -231,12 +232,11 @@ contract Xcoin is ERC20, ERC1155 {
         userNFTs[msg.sender][foundIndex].quanity -= _amount;
 
         collectionNFTs[_unicueCollectionNFT].NFTInCollection.push(
-            structNFTsInSomething(_unicueNFT, _amount, 0)
+            structNFTsInSomething(_unicueNFT, msg.sender, _amount, 0)
         );
     }
 
     // Работа с магазином
-
     function setNFTInStore(
         uint256 _id,
         uint256 _amount,
@@ -262,12 +262,14 @@ contract Xcoin is ERC20, ERC1155 {
         storeNFT.push(
             structNFTsInSomething(
                 userNFTs[msg.sender][foundIndex].id,
+                msg.sender,
                 _amount,
                 _price
             )
         );
     }
 
+    // Добавить коллекцию в магазин
     function setCollectionInStore(
         uint256 _id,
         uint256 _amount,
@@ -293,12 +295,36 @@ contract Xcoin is ERC20, ERC1155 {
         storeCollectionNFT.push(
             structNFTsInSomething(
                 userNFTs[msg.sender][foundIndex].id,
+                msg.sender,
                 _amount,
                 _price
             )
         );
     }
 
+    // Покупка NFT
+    function buyNFT(uint256 _index, uint256 _amount) public payable {
+        
+        uint256 priceToken = storeNFT[_index].price * _amount;
+        address ownerToken = storeNFT[_index].owner;
+        uint256 amountNFT = storeNFT[_index].amount;
+        bytes memory data = "";
+
+        require(balanceOf(msg.sender) >= priceToken, "Not enough Xcoin");
+        require(amountNFT >= _amount, "Incorect amount");
+        require(ownerToken != msg.sender, "The token owner cannot buy his NFT");
+
+        transfer(ownerToken, priceToken);
+
+        safeTransferFrom(ownerToken, msg.sender, storeNFT[_index].id, _amount, data);
+
+        amountNFT -= _amount;
+
+        if (amountNFT == 0) {
+            storeNFT[_index] = storeNFT[storeNFT.length -1];
+            storeNFT.pop();
+        }
+    }
 
     constructor() ERC20("Xcoin", "X") ERC1155("./images/") {
         owner = msg.sender;
