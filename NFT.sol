@@ -100,7 +100,7 @@ contract Xcoin is ERC20, ERC1155 {
         uint256 _index
     ) public view returns (structNFT memory) {
         require(
-            _index < userNFTs[_addressOwnerNFT].length,
+            _index <= userNFTs[_addressOwnerNFT].length,
             "Not found this NFT"
         );
 
@@ -152,7 +152,7 @@ contract Xcoin is ERC20, ERC1155 {
         string memory _description,
         string memory _imgPath,
         uint256 _amount
-    ) public onlyOwner {
+    ) public {
         _mint(msg.sender, unicueNFT, _amount, "");
 
         // Пуш в мапинг нфт, которыми владеет юзер
@@ -287,14 +287,16 @@ contract Xcoin is ERC20, ERC1155 {
             }
         }
 
-        require(found, "NFT not found");
-        require(userCollectionsNFTs[msg.sender][foundIndex].state == true, "This collection in store");
+        require(collectionNFTs[_id].id == _id, "Collection not found");
+        require(owner_collection[_id] == msg.sender, "You are not owner this collection");
+        require(_amount > 0, "Amount must be > 0");
+        require(!collectionNFTs[_id].state, "Collection already in store");
 
         userCollectionsNFTs[msg.sender][foundIndex].state = true;
 
         storeCollectionNFT.push(
             structNFTsInSomething(
-                userNFTs[msg.sender][foundIndex].id,
+                _id,
                 msg.sender,
                 _amount,
                 _price
