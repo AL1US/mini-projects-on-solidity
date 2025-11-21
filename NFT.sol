@@ -12,8 +12,8 @@ contract Xcoin is ERC20, ERC1155 {
 
     uint256 public constant INITIAL_SUPPLY = 1_000_000 * 10 ** 18; // количество всех токенов в системе
 
-    structNFT[] public storeNFT; // Массив магазина
-    structCollectionNFT[] public storeCollectionNFT; // Такой же массив как и сверху
+    structNFTsInSomething[] public storeNFT; // Массив магазина
+    structNFTsInSomething[] public storeCollectionNFT; // Такой же массив как и сверху
 
     struct structNFT {
         uint256 id;
@@ -98,7 +98,10 @@ contract Xcoin is ERC20, ERC1155 {
         address _addressOwnerNFT,
         uint256 _index
     ) public view returns (structNFT memory) {
-        require(_index < userNFTs[_addressOwnerNFT].length, "Not found this NFT");
+        require(
+            _index < userNFTs[_addressOwnerNFT].length,
+            "Not found this NFT"
+        );
 
         return userNFTs[_addressOwnerNFT][_index];
     }
@@ -119,6 +122,29 @@ contract Xcoin is ERC20, ERC1155 {
         return collectionNFTs[_id];
     }
 
+    // Геттер на то, что есть в магазине NFT
+    function getStoreNFTForIndex(uint256 _index) public view returns (structNFTsInSomething memory) {
+        require(_index <= storeNFT.length);
+        return storeNFT[_index];
+    }
+
+    // Геттер на весь магазин NFT
+    function getAllNFTInStore() public view returns (structNFTsInSomething[] memory) {
+        return storeNFT;
+    }
+
+    // Геттер на коллекцию в магазине по индексу
+    function getStoreCollectionForIndex(uint256 _index) public view returns (structNFTsInSomething memory) {
+        require(_index < storeCollectionNFT.length, "Index out of bounds"); // < а не <= !
+        return storeCollectionNFT[_index];
+    }
+
+    // Весь магазин коллекций
+    function getAllCollectionsInStore() public view returns (structNFTsInSomething[] memory) {
+        return storeCollectionNFT;
+    }
+
+   
     // Сеттер на NFT
     function setNFT(
         string memory _name,
@@ -143,16 +169,16 @@ contract Xcoin is ERC20, ERC1155 {
             )
         );
 
-            // Добавление в мапинг всех нфт, просто чтобы можно было легко понять сколько их и тп
-            NFT[unicueNFT] = structNFT(
-                unicueNFT,
-                _name,
-                _description,
-                _imgPath,
-                0,
-                _amount,
-                block.timestamp
-            );
+        // Добавление в мапинг всех нфт, просто чтобы можно было легко понять сколько их и тп
+        NFT[unicueNFT] = structNFT(
+            unicueNFT,
+            _name,
+            _description,
+            _imgPath,
+            0,
+            _amount,
+            block.timestamp
+        );
     }
 
     // Сеттер на коллекцию
@@ -176,8 +202,15 @@ contract Xcoin is ERC20, ERC1155 {
     }
 
     //  Сеттер на добавление NFT в коллекцию
-    function setNFTInCollection(uint256 _unicueCollectionNFT, uint256 _unicueNFT, uint256 _amount) public {
-        require(owner_collection[_unicueCollectionNFT] == msg.sender, "You are not owner this collection");
+    function setNFTInCollection(
+        uint256 _unicueCollectionNFT,
+        uint256 _unicueNFT,
+        uint256 _amount
+    ) public {
+        require(
+            owner_collection[_unicueCollectionNFT] == msg.sender,
+            "You are not owner this collection"
+        );
         require(_amount > 0, "Amount must be > 0");
 
         bool found = false;
@@ -189,7 +222,7 @@ contract Xcoin is ERC20, ERC1155 {
                     found = true;
                     foundIndex = i;
                     break; // нашли - выходим
-                } 
+                }
             }
         }
 
@@ -199,6 +232,70 @@ contract Xcoin is ERC20, ERC1155 {
 
         collectionNFTs[_unicueCollectionNFT].NFTInCollection.push(
             structNFTsInSomething(_unicueNFT, _amount, 0)
+        );
+    }
+
+    // Работа с магазином
+
+    function setNFTInStore(
+        uint256 _id,
+        uint256 _amount,
+        uint256 _price
+    ) public {
+        bool found = false;
+        uint256 foundIndex = 0;
+
+        for (uint256 i = 0; i < userNFTs[msg.sender].length; i++) {
+            if (userNFTs[msg.sender][i].id == _id) {
+                if (userNFTs[msg.sender][i].quanity >= _amount) {
+                    found = true;
+                    foundIndex = i;
+                    break;
+                }
+            }
+        }
+
+        require(found, "NFT not found");
+
+        userNFTs[msg.sender][foundIndex].quanity -= _amount;
+
+        storeNFT.push(
+            structNFTsInSomething(
+                userNFTs[msg.sender][foundIndex].id,
+                _amount,
+                _price
+            )
+        );
+    }
+
+    function setCollectionInStore(
+        uint256 _id,
+        uint256 _amount,
+        uint256 _price
+    ) public {
+
+        bool found = false;
+        uint256 foundIndex = 0;
+
+        for (uint256 i = 0; i < userCollectionsNFTs[msg.sender].length; i++) {
+            if (userCollectionsNFTs[msg.sender][i].id == _id) {
+                    found = true;
+                    foundIndex = i;
+                    break;
+            }
+        }
+
+        require(found, "NFT not found");
+        require(userCollectionsNFTs[msg.sender][foundIndex].state == true, "This collection in store");
+
+        userCollectionsNFTs[msg.sender][foundIndex].state = true;
+
+        storeCollectionNFT.push(
+            structNFTsInSomething(
+                userNFTs[msg.sender][foundIndex].id,
+                _amount,
+                _price
+            )
         );
     }
 
