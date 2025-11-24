@@ -29,8 +29,8 @@ contract Xcoin is ERC20, ERC1155 {
     struct structNFTsInSomething {
         uint256 id;
         address owner;
-        uint256 amount;
-        uint256 price; // При добавлении в коллекцию не указывается, только если мы добавляем в магазин
+        uint256 amount; // Работает только у NFT, у коллекций по умолчанию будет 1
+        uint256 price; // указывается только если мы добавляем в магазин
     }
 
     struct structCollectionNFT {
@@ -306,12 +306,10 @@ contract Xcoin is ERC20, ERC1155 {
     // Добавить коллекцию в магазин
     function setCollectionInStore(
         uint256 _id,
-        uint256 _amount,
         uint256 _price
     ) public {
         require(collectionNFTs[_id].id == _id, "Collection not found");
         require(owner_collection[_id] == msg.sender, "You are not owner");
-        require(_amount > 0, "Amount must be > 0");
         require(!collectionNFTs[_id].state, "Already in store");
 
         collectionNFTs[_id].state = true;
@@ -321,7 +319,7 @@ contract Xcoin is ERC20, ERC1155 {
             structNFTsInSomething(
                 _id,
                 msg.sender,
-                _amount,
+                1,
                 _price
             )
         );
@@ -364,7 +362,7 @@ contract Xcoin is ERC20, ERC1155 {
         }
     }
     // Покупка коллекции
-    function buyCollection(uint256 _collectionId) public {
+    function buyCollection(uint256 _collectionId) public payable {
 
         uint256 storeIndex = 0;
         for (uint256 i = 0; i < storeCollectionNFT.length; i++) {
