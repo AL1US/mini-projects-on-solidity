@@ -5,6 +5,18 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 
 contract Xcoin is ERC20, ERC1155 {
+
+    /* ПРОБЛЕМЫ КОНТРАКТА:
+    * Никогда нельзя совмещать вместе работу нескольких токенов, всё должно быть в различных файлах
+
+    * У меня вылазила ошибка на весь контракт, которая связана с тем, что я memory переожу в storage 
+    * и чтобы это пофиксить, пришлось включать  viaIR который позволяет это делать. Включается она в конфиге
+
+    * Слишком много перезаписей массивов, слишком много циклов. Это очень дорого и очень нагружает контракт
+
+    * Явно еще какая либо беда есть
+
+    */
     address owner;
 
     uint public unicueNFT; // Своего рода id для nft и коллекций
@@ -129,7 +141,7 @@ contract Xcoin is ERC20, ERC1155 {
         return storeNFT[_index];
     }
 
-    // Геттер на весь магазин NFT
+    // ГеттерCна весь магазин NFT
     function getAllNFTInStore() public view returns (structNFTsInSomething[] memory) {
         return storeNFT;
     }
@@ -238,10 +250,12 @@ contract Xcoin is ERC20, ERC1155 {
 
     // Работа с магазином
     // По сути эта функция уже есть в контракте, но там нужно вводить адрес и всё такое, а тут сразу кнопка
+    // Мы работаем так, что передаём всё контракту и от туда уже всё уходит покупателю
     function approveForContract() public {
         setApprovalForAll(address(this), true);
     }
 
+    // Добавить NFT в магазин
     function setNFTInStore(
         uint256 _id,
         uint256 _amount,
@@ -249,7 +263,7 @@ contract Xcoin is ERC20, ERC1155 {
     ) public {
         bool found = false;
         uint256 foundIndex = 0;
-        bytes memory data = "";
+        bytes memory data = ""; // Просто пустая строчка байтов, оно требуется в параметрах
 
 
         for (uint256 i = 0; i < userNFTs[msg.sender].length; i++) {
@@ -264,11 +278,12 @@ contract Xcoin is ERC20, ERC1155 {
 
         require(found, "NFT not found");
 
-        safeTransferFrom(msg.sender, address(this), _id, _amount, data);
+        safeTransferFrom(msg.sender, address(this), _id, _amount, data); // Перевод самих токенов
 
-        userNFTs[msg.sender][foundIndex].quanity -= _amount;
+        userNFTs[msg.sender][foundIndex].quanity -= _amount; // уменьшаем количество
 
-        storeNFT.push(
+        // пушим в массив магазина
+        storeNFT.push( 
             structNFTsInSomething(
                 userNFTs[msg.sender][foundIndex].id,
                 msg.sender,
@@ -278,13 +293,15 @@ contract Xcoin is ERC20, ERC1155 {
         );
     }
 
+    // Отмена продажи NFT 
     function cancelNFTSale(uint256 _tokenId) public {
         for (uint256 i = 0; i < storeNFT.length; i++) {
             if (storeNFT[i].id == _tokenId && storeNFT[i].owner == msg.sender) {
                 
                 uint256 amount = storeNFT[i].amount;
 
-                // Возвращаем NFT
+                // Возвращаем NFT владельцу от контракта. Не забываем, что при добавлении его в магазин 
+                // оно идет в контракт, а потом уже покупателю
                 _safeTransferFrom(address(this), msg.sender, _tokenId, amount, "");
 
                 // Возвращаем количество NFT юзеру
@@ -295,7 +312,7 @@ contract Xcoin is ERC20, ERC1155 {
                     }
                 }
 
-                // Удаляем
+                // Удаляем из магазина
                 storeNFT[i] = storeNFT[storeNFT.length - 1];
                 storeNFT.pop();
                 break;
@@ -330,7 +347,10 @@ contract Xcoin is ERC20, ERC1155 {
             if (storeCollectionNFT[i].id == _collectionId && storeCollectionNFT[i].owner == msg.sender) {
                 
                 collectionNFTs[_collectionId].state = false; // true -> in store / false -> not in store. Можно сделать так
-                                                             // потомучто у нас нет колличества на коллекциях                                            
+                                                             // потомучто у нас нет колличества на коллекциях        
+                                                    // с NFT сложнее, потомучто у них есть количество. Например если у нас есть 5 NFT, и 
+                                                    // Выставлю я 3, то просто поменять состояние недостаточно, так как я не смогу потом выставить остальные
+                                                    // Поэтому обычные NFT приходится сувать из массива в массив                                    
                 storeCollectionNFT[i] = storeCollectionNFT[storeCollectionNFT.length - 1];
                 storeCollectionNFT.pop();
                 break;
@@ -348,20 +368,22 @@ contract Xcoin is ERC20, ERC1155 {
 
         require(balanceOf(msg.sender) >= priceToken, "Not enough Xcoin");
         require(amountNFT >= _amount, "Incorect amount");
-        require(ownerToken != msg.sender, "The token owner cannot buy his NFT");
+        require(ownerToken != msg.sender, "The token owner cannot buy his NFT"); // мы не можем купить свой же NFT
 
         transfer(ownerToken, priceToken);
 
-        safeTransferFrom(address(this), msg.sender, storeNFT[_index].id, _amount, data);
+        safeTransferFrom(address(this), msg.sender, storeNFT[_index].id, _amount, data); // Переводим с адреса контракта покупателю
 
-        storeNFT[_index].amount -= _amount;
+        storeNFT[_index].amount -= _amount; // уменьшаем количество NFT в магазине
 
+        // Удаляем если количество NFT = 0
         if (storeNFT[_index].amount == 0) {
             storeNFT[_index] = storeNFT[storeNFT.length - 1];
             storeNFT.pop();
         }
     }
     // Покупка коллекции
+    // Это говно писал не я !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     function buyCollection(uint256 _collectionId) public payable {
 
         uint256 storeIndex = 0;
