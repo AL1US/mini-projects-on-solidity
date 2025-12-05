@@ -3,57 +3,29 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
-contract Xcoin is ERC20, ERC1155 {
+contract Xcoin is ERC20, ERC1155, ERC1155Holder{
 
-    /* ПРОБЛЕМЫ КОНТРАКТА:
-    * Никогда нельзя совмещать вместе работу нескольких токенов, всё должно быть в различных файлах
 
-    * У меня вылазила ошибка на весь контракт, которая связана с тем, что я memory переожу в storage 
-    * и чтобы это пофиксить, пришлось включать  viaIR который позволяет это делать. Включается она в конфиге
+    /*
+    * ПЕРЕМЕННЫЕ
+    */ 
 
-    * Слишком много перезаписей массивов, слишком много циклов. Это очень дорого и очень нагружает контракт
-
-    * Явно еще какая либо беда есть
-
-    */
     address owner;
-
-    uint public unicueNFT; // Своего рода id для nft и коллекций
+    
+    // Своего рода id для nft и коллекций
+    uint public unicueNFT; 
     uint public unicueCollectionNFT;
+
+    uint256 public indexNFTInStore;
+    uint256 public unicueCollectionNFTInStore;
 
     uint256 public constant INITIAL_SUPPLY = 1_000_000 * 10 ** 18; // количество всех токенов в системе
 
-    structNFTsInSomething[] public storeNFT; // Массив магазина
-    structNFTsInSomething[] public storeCollectionNFT; // Такой же массив как и сверху
-
-    struct structNFT {
-        uint256 id;
-        string name;
-        string description;
-        string imgPath;
-        uint256 price;
-        uint256 quanity;
-        uint256 creationDate;
-    }
-
-    // Структура, для того чтобы можно было только по id и количеству помещать NFT в магазин, коллекцию или аукцион
-    struct structNFTsInSomething {
-        uint256 id;
-        address owner;
-        uint256 amount; // Работает только у NFT, у коллекций по умолчанию будет 1
-        uint256 price; // указывается только если мы добавляем в магазин
-    }
-
-    struct structCollectionNFT {
-        uint256 id;
-        string name;
-        string description;
-        uint256 price;
-        structNFTsInSomething[] NFTInCollection;
-        bool state;
-        uint256 creationDate;
-    }
+    /*
+    * STRUCT
+    */
 
     struct structUser {
         string nameUser;
@@ -61,127 +33,131 @@ contract Xcoin is ERC20, ERC1155 {
         uint256 discont; // Процент скидки
     }
 
-    // Структура для ставки на аукционе
-    struct structBet {
-        address ownerBet;
-        uint256 priceBet;
-    }
-
-    // Структура на аукционе
-    struct structAction {
+    // Для того чтобы можно было помещать nft в коллекцию
+    struct structNFTsInCollection {
         uint256 id;
-        structCollectionNFT collection;
-        uint256 minPrice;
-        uint256 timeStart;
-        uint256 timeEnd;
+        uint256 amount; 
     }
 
-    // Для отображения nft и коллекций по id(unicueNFT)
-    mapping(uint256 => structNFT) public NFT;
-    mapping(uint256 => structCollectionNFT) public collectionNFTs;
+    // Обычные nft
+    struct structNFT {
+        uint256 id;
+        string name;
+        string description;
+        string imgPath;
+        uint256 price; // Заполняется только после помещения в магазин
+        uint256 amount; // Также выступает в роли проверки существования nft
+        uint256 creationDate;
+    }
 
-    // Для того чтобы понять чем владеет юзер, ну вернее для утобного отображения
-    mapping(address => structNFT[]) public userNFTs;
-    mapping(address => structCollectionNFT[]) public userCollectionsNFTs;
+    // Коллекции. По сути это просто метаданные, которые ни как не влияют на обычные nft, но благодоря коллекциями
+    // nft можно объединять, опять же только по метаданным, на сами nft по токену это не как не влияет
+    struct structCollectionNFT {
+        uint256 id;
+        string name;
+        string description;
+        uint256 price; // Заполняется только после помещения в магазин
+        structNFTsInCollection[] NFTInCollection;
+        bool state; // Нужно для того чтобы понять в магазине или нет
+        bool existence; // Нужно для проверки того, есть ли такая коллекция у юзера
+        uint256 creationDate;
+    }
 
-    // Данные юзера
+    /*
+    * structSTORE
+    */
+
+    // Для того чтобы не засорять магазин ненужными данными, можно создать структуру только с теми данными
+    // которые будет нам нужны
+
+    struct structNFTsInStore {
+        uint256 id;
+        address owner;
+        uint256 amount;
+        uint256 price;
+    }
+
+    struct structCollectionInStore {
+        uint256 id;
+        address owner;
+        uint256 price;
+    }
+
+    /*
+    * MAPPING
+    */ 
+
+    // Используются именно мапинги, а не массивы, для того чтобы не нагружать контракт циклами,
+    // для оптимизации использования газа, и легкости контрактка (кода соответсвтенно становится меньше)
+
+    mapping(address => mapping(uint256 => structNFT)) public NFT;
+    mapping(address => mapping(uint256 => structCollectionNFT)) public collectionNFTs;
+
+    // Используется для того, чтобы понять какие вобще nft существют. Особенно помогает когда юзер
+    // Покупает nft после чего, к нему в мапинг его nft можно просто и удобно добавить по id его куплленный. 
+    mapping(uint256 => structNFT) public allNFT;
+    mapping(uint256 => structCollectionNFT) public allCollection;
+
     mapping(address => structUser) public user;
 
-    // Работа с коллекциями
-    mapping(uint256 => address) public owner_collection;
+    /*
+    * mapping STORE
+    */ 
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "You are not owner");
-        _;
+    mapping(uint256 => structNFTsInStore) public storeNFT; // index => struct
+    mapping(uint256 => structCollectionInStore) public storeCollectionNFT;
+
+
+    /*
+    * GET
+    */
+
+    // Геттер nft по id 
+    function getNFT(uint256 _id) public view returns(structNFT memory) {
+        return NFT[msg.sender][_id];
     }
 
-    // Геттер на данные юзера
-    function getProfile()
-        public
-        view
-        returns (structUser memory _user, uint256 _balance)
-    {
-        _user = user[msg.sender];
-        _balance = balanceOf(msg.sender);
+    // Геттер коллекции по id
+    function getCollection(uint256 _id) public view returns(structCollectionNFT memory) {
+        return collectionNFTs[msg.sender][_id];
     }
 
-    // Геттеры на NFT
-    // Геттер на NFT которые есть у юзера в массиве ( нужно для проверку того, что юзер действительно ими владеет)
-    function getNFTUser(
-        address _addressOwnerNFT,
-        uint256 _index
-    ) public view returns (structNFT memory) {
-        require(
-            _index <= userNFTs[_addressOwnerNFT].length,
-            "Not found this NFT"
-        );
+    /*
+    * GET STORE
+    */ 
 
-        return userNFTs[_addressOwnerNFT][_index];
-    }
-
-    function getMyAllNFT() public view returns (structNFT[] memory) {
-        return userNFTs[msg.sender];
-    }
-
-    // Просто геттер на NFT по id
-    function getNFTForId(uint256 _id) public view returns (structNFT memory) {
-        return NFT[_id];
-    }
-
-    //  Геттеры на коллекции
-    function getCollection(
-        uint256 _id
-    ) public view returns (structCollectionNFT memory) {
-        return collectionNFTs[_id];
-    }
-
-    // Геттер на то, что есть в магазине NFT
-    function getStoreNFTForIndex(uint256 _index) public view returns (structNFTsInSomething memory) {
-        require(_index <= storeNFT.length);
+    // Геттер nft в магазине по индексу
+    function getStoreNFT(uint256 _index) public view returns (structNFTsInStore memory) {
         return storeNFT[_index];
     }
-
-    // ГеттерCна весь магазин NFT
-    function getAllNFTInStore() public view returns (structNFTsInSomething[] memory) {
-        return storeNFT;
-    }
-
-    // Геттер на коллекцию в магазине по индексу
-    function getStoreCollectionForIndex(uint256 _index) public view returns (structNFTsInSomething memory) {
-        require(_index < storeCollectionNFT.length, "Index out of bounds"); // < а не <= !
+    // get col in store
+    function getColNFT(uint256 _index) public view returns (structCollectionInStore memory) {
         return storeCollectionNFT[_index];
     }
-
-    // Весь магазин коллекций
-    function getAllCollectionsInStore() public view returns (structNFTsInSomething[] memory) {
-        return storeCollectionNFT;
-    }
-
-   
-    // Сеттер на NFT
+    
+    // Создать nft
     function setNFT(
         string memory _name,
         string memory _description,
         string memory _imgPath,
         uint256 _amount
     ) public {
-        _mint(msg.sender, unicueNFT, _amount, "");
 
-        // Пуш в мапинг нфт, которыми владеет юзер
-        userNFTs[msg.sender].push(
-            structNFT(
-                unicueNFT,
-                _name,
-                _description,
-                _imgPath,
-                0, // Цена указывается после того, как нфт идёт в продажу
-                _amount,
-                block.timestamp
-            )
+        _mint(msg.sender, unicueNFT, _amount, ""); // Создание nft в системе. Последний параметр принимает комментарий
+
+        // Добавление в мапинг юзера
+        NFT[msg.sender][unicueNFT] = structNFT(
+            unicueNFT,
+            _name,
+            _description,
+            _imgPath,
+            0,
+            _amount,
+            block.timestamp
         );
 
-        // Добавление в мапинг всех нфт, просто чтобы можно было легко понять сколько их и тп
-        NFT[unicueNFT] = structNFT(
+        // Добавление в мапинг всех NFT
+        allNFT[unicueNFT] = structNFT(
             unicueNFT,
             _name,
             _description,
@@ -194,248 +170,226 @@ contract Xcoin is ERC20, ERC1155 {
         unicueNFT++;
     }
 
-    // Сеттер на коллекцию
+    // Создать коллекцию
     function setCollection(
         string memory _name,
         string memory _description
     ) public {
-        collectionNFTs[unicueCollectionNFT] = structCollectionNFT(
+        collectionNFTs[msg.sender][unicueCollectionNFT] = structCollectionNFT(
+            unicueCollectionNFT,
+            _name,
+            _description,
+            0, // цена указывается после выставления её на продажу
+            new structNFTsInCollection[](0), // нужно для id и количства
+            false, // в магазине -> true / не в магазине -> false
+            true, // Означет, что коллекция существует
+            block.timestamp
+        );
+
+        // Добавление в мапинг всех коллекций
+        allCollection[unicueCollectionNFT] = structCollectionNFT(
             unicueCollectionNFT,
             _name,
             _description,
             0,
-            new structNFTsInSomething[](0),
-            false,
+            new structNFTsInCollection[](0),
+            false, 
+            true, 
             block.timestamp
         );
-
-        owner_collection[unicueCollectionNFT] = msg.sender;
 
         unicueCollectionNFT++;
     }
 
-    //  Сеттер на добавление NFT в коллекцию
+    // Добавить nft в коллекцию
     function setNFTInCollection(
-        uint256 _unicueCollectionNFT,
-        uint256 _unicueNFT,
+        uint256 _idCollection,
+        uint256 _idNFT,
         uint256 _amount
     ) public {
-        require(
-            owner_collection[_unicueCollectionNFT] == msg.sender,
-            "You are not owner this collection"
-        );
+        // Проверка на то есть ли NFT у юзера
+        require(NFT[msg.sender][_idNFT].amount >= _amount, "You don't have this NFT");
+        require(collectionNFTs[msg.sender][_idCollection].existence, "You don't have this collection");
+        require(!collectionNFTs[msg.sender][_idCollection].state, "Collection already in store");
+
         require(_amount > 0, "Amount must be > 0");
 
-        bool found = false;
-        uint256 foundIndex = 0;
-
-        for (uint256 i = 0; i < userNFTs[msg.sender].length; i++) {
-            if (userNFTs[msg.sender][i].id == _unicueNFT) {
-                if (userNFTs[msg.sender][i].quanity >= _amount) {
-                    found = true;
-                    foundIndex = i;
-                    break; // нашли - выходим
-                }
-            }
-        }
-
-        require(found, "NFT not found");
-
-        userNFTs[msg.sender][foundIndex].quanity -= _amount;
-
-        collectionNFTs[_unicueCollectionNFT].NFTInCollection.push(
-            structNFTsInSomething(_unicueNFT, msg.sender, _amount, 0)
+        // Добавление выбраннх nft в коллекцию
+        collectionNFTs[msg.sender][_idCollection].NFTInCollection.push(
+            structNFTsInCollection(_idNFT, _amount)
         );
-    }
 
-    // Работа с магазином
-    // По сути эта функция уже есть в контракте, но там нужно вводить адрес и всё такое, а тут сразу кнопка
-    // Мы работаем так, что передаём всё контракту и от туда уже всё уходит покупателю
-    function approveForContract() public {
-        setApprovalForAll(address(this), true);
-    }
+        // вычитаем все добавленные nft
+        NFT[msg.sender][_idNFT].amount -= _amount;
 
-    // Добавить NFT в магазин
-    function setNFTInStore(
-        uint256 _id,
-        uint256 _amount,
-        uint256 _price
-    ) public {
-        bool found = false;
-        uint256 foundIndex = 0;
-        bytes memory data = ""; // Просто пустая строчка байтов, оно требуется в параметрах
-
-
-        for (uint256 i = 0; i < userNFTs[msg.sender].length; i++) {
-            if (userNFTs[msg.sender][i].id == _id) {
-                if (userNFTs[msg.sender][i].quanity >= _amount) {
-                    found = true;
-                    foundIndex = i;
-                    break;
-                }
-            }
-        }
-
-        require(found, "NFT not found");
-
-        safeTransferFrom(msg.sender, address(this), _id, _amount, data); // Перевод самих токенов
-
-        userNFTs[msg.sender][foundIndex].quanity -= _amount; // уменьшаем количество
-
-        // пушим в массив магазина
-        storeNFT.push( 
-            structNFTsInSomething(
-                userNFTs[msg.sender][foundIndex].id,
-                msg.sender,
-                _amount,
-                _price
-            )
-        );
-    }
-
-    // Отмена продажи NFT 
-    function cancelNFTSale(uint256 _tokenId) public {
-        for (uint256 i = 0; i < storeNFT.length; i++) {
-            if (storeNFT[i].id == _tokenId && storeNFT[i].owner == msg.sender) {
-                
-                uint256 amount = storeNFT[i].amount;
-
-                // Возвращаем NFT владельцу от контракта. Не забываем, что при добавлении его в магазин 
-                // оно идет в контракт, а потом уже покупателю
-                _safeTransferFrom(address(this), msg.sender, _tokenId, amount, "");
-
-                // Возвращаем количество NFT юзеру
-                for (uint256 j = 0; j < userNFTs[msg.sender].length; j++) {
-                    if (userNFTs[msg.sender][j].id == _tokenId) {
-                        userNFTs[msg.sender][j].quanity += amount;
-                        break;
-                    }
-                }
-
-                // Удаляем из магазина
-                storeNFT[i] = storeNFT[storeNFT.length - 1];
-                storeNFT.pop();
-                break;
-            }
+        // Если nft у юзера закончились, то мы удаляем их
+        if (NFT[msg.sender][_idNFT].amount == 0) {
+            delete NFT[msg.sender][_idNFT];
         }
     }
 
-    // Добавить коллекцию в магазин
-    function setCollectionInStore(
-        uint256 _id,
-        uint256 _price
-    ) public {
-        require(collectionNFTs[_id].id == _id, "Collection not found");
-        require(owner_collection[_id] == msg.sender, "You are not owner");
-        require(!collectionNFTs[_id].state, "Already in store");
+    /*
+    * SET STORE
+    */
 
-        collectionNFTs[_id].state = true;
-        collectionNFTs[_id].price = _price; 
+    // Добавить nft в магазин по id
+    function setNFTInStore(uint256 _id, uint256 _amount, uint256 _price) public {
+        require(NFT[msg.sender][_id].amount >= _amount, "You don't have this NFT");
+        require(_amount > 0, "Amount must be > 0");
+        require(isApprovedForAll(msg.sender, address(this)), "Please approve the marketplace");
 
-        storeCollectionNFT.push(
-            structNFTsInSomething(
-                _id,
-                msg.sender,
-                1,
-                _price
-            )
-        );
-    }
-
-    function cancelCollectionSale(uint256 _collectionId) public {
-        for (uint256 i = 0; i < storeCollectionNFT.length; i++) {
-            if (storeCollectionNFT[i].id == _collectionId && storeCollectionNFT[i].owner == msg.sender) {
-                
-                collectionNFTs[_collectionId].state = false; // true -> in store / false -> not in store. Можно сделать так
-                                                             // потомучто у нас нет колличества на коллекциях        
-                                                    // с NFT сложнее, потомучто у них есть количество. Например если у нас есть 5 NFT, и 
-                                                    // Выставлю я 3, то просто поменять состояние недостаточно, так как я не смогу потом выставить остальные
-                                                    // Поэтому обычные NFT приходится сувать из массива в массив                                    
-                storeCollectionNFT[i] = storeCollectionNFT[storeCollectionNFT.length - 1];
-                storeCollectionNFT.pop();
-                break;
-            }
-        }
-    }
-
-    // Покупка NFT
-    function buyNFT(uint256 _index, uint256 _amount) public payable {
-        
-        uint256 priceToken = storeNFT[_index].price * _amount;
-        address ownerToken = storeNFT[_index].owner;
-        uint256 amountNFT = storeNFT[_index].amount;
         bytes memory data = "";
 
-        require(balanceOf(msg.sender) >= priceToken, "Not enough Xcoin");
-        require(amountNFT >= _amount, "Incorect amount");
-        require(ownerToken != msg.sender, "The token owner cannot buy his NFT"); // мы не можем купить свой же NFT
+        // Добавлем в мапинг
+        storeNFT[indexNFTInStore] = structNFTsInStore(
+            _id,
+            msg.sender,
+            _amount,
+            _price
+        );
 
-        transfer(ownerToken, priceToken);
+        // Переводим наши нфт контракту. Что-то типа листинга. Реализуется в main
+        safeTransferFrom(msg.sender, address(this), _id, _amount, data);
+        // safeTransferFrom(from, to, id, value, data);
 
-        safeTransferFrom(address(this), msg.sender, storeNFT[_index].id, _amount, data); // Переводим с адреса контракта покупателю
+        // вычитаем все добавленные nft
+        NFT[msg.sender][_id].amount -= _amount;
 
-        storeNFT[_index].amount -= _amount; // уменьшаем количество NFT в магазине
-
-        // Удаляем если количество NFT = 0
-        if (storeNFT[_index].amount == 0) {
-            storeNFT[_index] = storeNFT[storeNFT.length - 1];
-            storeNFT.pop();
+        // Если nft у юзера закончились, то мы удаляем их
+        if (NFT[msg.sender][_id].amount == 0) {
+            delete NFT[msg.sender][_id];
         }
+
+        indexNFTInStore ++;
     }
-    // Покупка коллекции
-    // Это говно писал не я !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    function buyCollection(uint256 _collectionId) public payable {
 
-        uint256 storeIndex = 0;
-        for (uint256 i = 0; i < storeCollectionNFT.length; i++) {
-            if (storeCollectionNFT[i].id == _collectionId) {
-                storeIndex = i;
-                break;
-            }
+    // Покупка nft по id.                                                   
+    function buyNFT(uint256 _index, uint256 _amount) public payable {
+
+        uint256 _id = storeNFT[_index].id;
+
+        structNFT memory myNewNFT = allNFT[_id];
+        uint256 priceNFT = storeNFT[_index].price * _amount;
+        uint256 amountNFT = storeNFT[_index].amount;
+        address ownerNFT = storeNFT[_index].owner;
+        bytes memory data = "";
+
+        require(storeNFT[_index].owner != msg.sender, "The owner of the nft cannot buy it from himself");
+        require(balanceOf(msg.sender) >= priceNFT, "You dot't have ehougn Xcoin");
+        require(amountNFT >= _amount, "Your chosen amount increases the number of tokens in the store.");
+        require(amountNFT != 0, "This nft does not exist");
+        require(balanceOf(address(this), _id) >= _amount, "Contract don't have this NFTs");
+
+        // перевод токенов овнеру nft
+        transfer(ownerNFT, priceNFT);
+
+        // перевод самих nft
+        _safeTransferFrom(address(this), msg.sender, _id, _amount, data);
+
+        // вычитание _amount из amount
+        storeNFT[_index].amount -= _amount;
+
+        // Если такой nft уже есть у юзера, то мы добавляем просто цифорки к количеству его nft
+        if (NFT[msg.sender][_id].amount > 0) {
+            NFT[msg.sender][_id].amount += _amount;
+        } else {
+            NFT[msg.sender][_id] = myNewNFT;
+            NFT[msg.sender][_id].amount = _amount;
         }
-        require(storeIndex < storeCollectionNFT.length, "Collection not in store");
 
-        address seller = storeCollectionNFT[storeIndex].owner;
-        uint256 price = storeCollectionNFT[storeIndex].price;
+        // if amount in store == 0 -> del this nft 
+        if (storeNFT[_index].amount == 0) {
+            delete storeNFT[_index];
+        }
 
-        require(seller != msg.sender, "Cannot buy own collection");
+    }
+
+    function setCollectionInStore(uint256 _id, uint256 _price) public {
+
+        require(collectionNFTs[msg.sender][_id].existence, "You don't have this collection");
+        require(!collectionNFTs[msg.sender][_id].state, "Collection already in store");
+        require(isApprovedForAll(msg.sender, address(this)), "Please approve the marketplace");
+
+        // Создаём объект для удобной работы с ним
+        structNFTsInCollection[] storage col = collectionNFTs[msg.sender][_id].NFTInCollection;
+        require(col.length > 0, "Collection is empty");
+
+        // Собираем массивы для batch transfer
+        uint256[] memory ids = new uint256[](col.length);
+        uint256[] memory amounts = new uint256[](col.length);
+
+        for (uint256 i = 0; i < col.length; i++) {
+            ids[i] = col[i].id;
+            amounts[i] = col[i].amount;
+        }
+
+        // Передаём всю коллекцию контракту
+        safeBatchTransferFrom(msg.sender, address(this), ids, amounts, "");
+
+        // Сохраняем коллекцию в магазин
+        storeCollectionNFT[unicueCollectionNFTInStore] = structCollectionInStore(
+            _id,
+            msg.sender,
+            _price
+        );
+
+        // Отмечаем что она в магазине
+        collectionNFTs[msg.sender][_id].state = true;
+
+        unicueCollectionNFTInStore++;
+    }
+
+    function buyCollection(uint256 _index) public payable {
+        // Достаём данные из магазина
+        structCollectionInStore memory colStore = storeCollectionNFT[_index];
+        
+        address ownerCol = colStore.owner;
+        uint256 idCol = colStore.id;
+        uint256 price = colStore.price;
+
+        // Достаём данные о коллекции в мапинге всех коллекций
+        structCollectionNFT memory myNewCollection = allCollection[idCol];
+        
+        require(ownerCol != address(0), "Collection does not exist");
+        require(ownerCol != msg.sender, "Owner cannot buy own collection");
         require(balanceOf(msg.sender) >= price, "Not enough Xcoin");
 
+        // Перевод денег владельцу
+        transfer(ownerCol, price);
 
-        _transfer(msg.sender, seller, price);
+        // Достаём nft внутри коллекции
+        structNFTsInCollection[] storage col = collectionNFTs[ownerCol][idCol].NFTInCollection;
 
-        structCollectionNFT storage col = collectionNFTs[_collectionId];
+        uint256[] memory ids = new uint256[](col.length);
+        uint256[] memory amounts = new uint256[](col.length);
 
-        // хренатень чтобы передать все нфт из коллекции
-        for (uint256 j = 0; j < col.NFTInCollection.length; j++) {
-            _safeTransferFrom(
-                address(this),
-                msg.sender,
-                col.NFTInCollection[j].id,
-                col.NFTInCollection[j].amount,
-                ""
-            );
+        for (uint256 i = 0; i < col.length; i++) {
+            ids[i] = col[i].id;
+            amounts[i] = col[i].amount;
         }
 
-        // Так как продавец больше не владелец, надо удалить его коллекцию
-        for (uint256 k = 0; k < userCollectionsNFTs[seller].length; k++) {
-            if (userCollectionsNFTs[seller][k].id == _collectionId) {
-                userCollectionsNFTs[seller][k] = userCollectionsNFTs[seller][userCollectionsNFTs[seller].length - 1];
-                userCollectionsNFTs[seller].pop();
-                break;
-            }
-        }
-        // пушим юзеру его только что купленную коллекцию
-        userCollectionsNFTs[msg.sender].push(col);
+        // Перевод NFT с контракта покупателю
+        safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
 
-        // Обновляем владельца
-        owner_collection[_collectionId] = msg.sender;
-        col.state = false;
-        col.price = 0;
+        // Передаём коллекцию покупателю
+        collectionNFTs[msg.sender][idCol] = myNewCollection;
 
-        // Удаляем из магазина
-        storeCollectionNFT[storeIndex] = storeCollectionNFT[storeCollectionNFT.length - 1];
-        storeCollectionNFT.pop();
+        // Удаляем коллекцию у прошлого владельца
+        delete collectionNFTs[ownerCol][idCol];
+
+        // Удаляем коллекцию из магазина
+        delete storeCollectionNFT[_index];
+    }
+
+    // Эта штука как то решает проблему с тем, что этот контракт не может принимать nft
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC1155, ERC1155Holder)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 
     constructor() ERC20("Xcoin", "X") ERC1155("./images/") {
@@ -453,9 +407,7 @@ contract Xcoin is ERC20, ERC1155 {
         // user[0x90F79bf6EB2c4f870365E785982E1f101E93b906] = structUser("Jack", "PROFI15d32024", 0);
         // ERC20._transfer(owner, 0x90F79bf6EB2c4f870365E785982E1f101E93b906, 400_000);
 
-        // remix    
-
-
+        // remix
         user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser(
             "Tom",
             "PROFI4B202024",
@@ -488,5 +440,20 @@ contract Xcoin is ERC20, ERC1155 {
             0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB,
             400_000
         );
+
+        setNFT("myNFT0", "desc", "imgPath", 10);
+        setNFT("myNFT1", "desc", "imgPath", 10);
+        setNFT("myNFT2", "desc", "imgPath", 10);
+        setNFT("myNFT3", "desc", "imgPath", 10);
+
+        setCollection("myCol0", "description");
+        setCollection("myCol1", "description");
+        setNFTInCollection(0, 2, 5); // id col, id nft, amount
+        setNFTInCollection(1, 3, 3);
+
+        setApprovalForAll(address(this), true); // берём душу овнера в рабство без его согласия
+        setNFTInStore(1, 5, 50); // id, amount, price
+
+        setCollectionInStore(0, 15); // id коллекции, price
     }
-}   
+}
