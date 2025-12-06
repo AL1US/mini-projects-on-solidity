@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 contract Xcoin is ERC20, ERC1155, ERC1155Holder{
 
-
     /*
     * ПЕРЕМЕННЫЕ
     */ 
@@ -80,6 +79,7 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
     struct structCollectionInStore {
         uint256 id;
         address owner;
+        structNFTsInCollection[] NFTInCollection;
         uint256 price;
     }
 
@@ -96,7 +96,7 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
     // Используется для того, чтобы понять какие вобще nft существют. Особенно помогает когда юзер
     // Покупает nft после чего, к нему в мапинг его nft можно просто и удобно добавить по id его куплленный. 
     mapping(uint256 => structNFT) public allNFT;
-    mapping(uint256 => structCollectionNFT) public allCollection;
+    // mapping(uint256 => structCollectionNFT) public allCollection;
 
     mapping(address => structUser) public user;
 
@@ -131,7 +131,7 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         return storeNFT[_index];
     }
     // get col in store
-    function getColNFT(uint256 _index) public view returns (structCollectionInStore memory) {
+    function getCollectionInStore(uint256 _index) public view returns (structCollectionInStore memory) {
         return storeCollectionNFT[_index];
     }
     
@@ -183,18 +183,6 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
             new structNFTsInCollection[](0), // нужно для id и количства
             false, // в магазине -> true / не в магазине -> false
             true, // Означет, что коллекция существует
-            block.timestamp
-        );
-
-        // Добавление в мапинг всех коллекций
-        allCollection[unicueCollectionNFT] = structCollectionNFT(
-            unicueCollectionNFT,
-            _name,
-            _description,
-            0,
-            new structNFTsInCollection[](0),
-            false, 
-            true, 
             block.timestamp
         );
 
@@ -303,18 +291,14 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         }
 
     }
-
     function setCollectionInStore(uint256 _id, uint256 _price) public {
-
         require(collectionNFTs[msg.sender][_id].existence, "You don't have this collection");
         require(!collectionNFTs[msg.sender][_id].state, "Collection already in store");
         require(isApprovedForAll(msg.sender, address(this)), "Please approve the marketplace");
 
-        // Создаём объект для удобной работы с ним
         structNFTsInCollection[] storage col = collectionNFTs[msg.sender][_id].NFTInCollection;
         require(col.length > 0, "Collection is empty");
 
-        // Собираем массивы для batch transfer
         uint256[] memory ids = new uint256[](col.length);
         uint256[] memory amounts = new uint256[](col.length);
 
@@ -323,33 +307,30 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
             amounts[i] = col[i].amount;
         }
 
-        // Передаём всю коллекцию контракту
         safeBatchTransferFrom(msg.sender, address(this), ids, amounts, "");
 
         // Сохраняем коллекцию в магазин
-        storeCollectionNFT[unicueCollectionNFTInStore] = structCollectionInStore(
-            _id,
-            msg.sender,
-            _price
-        );
+        structCollectionInStore storage s = storeCollectionNFT[unicueCollectionNFTInStore];
+        s.id = _id;
+        s.owner = msg.sender;
+        s.price = _price;
 
-        // Отмечаем что она в магазине
+        for (uint256 i = 0; i < col.length; i++) {
+            s.NFTInCollection.push(col[i]);
+        }
+
         collectionNFTs[msg.sender][_id].state = true;
-
         unicueCollectionNFTInStore++;
     }
 
     function buyCollection(uint256 _index) public payable {
         // Достаём данные из магазина
-        structCollectionInStore memory colStore = storeCollectionNFT[_index];
-        
+        structCollectionInStore storage colStore = storeCollectionNFT[_index];
+
         address ownerCol = colStore.owner;
         uint256 idCol = colStore.id;
         uint256 price = colStore.price;
 
-        // Достаём данные о коллекции в мапинге всех коллекций
-        structCollectionNFT memory myNewCollection = allCollection[idCol];
-        
         require(ownerCol != address(0), "Collection does not exist");
         require(ownerCol != msg.sender, "Owner cannot buy own collection");
         require(balanceOf(msg.sender) >= price, "Not enough Xcoin");
@@ -357,8 +338,8 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         // Перевод денег владельцу
         transfer(ownerCol, price);
 
-        // Достаём nft внутри коллекции
-        structNFTsInCollection[] storage col = collectionNFTs[ownerCol][idCol].NFTInCollection;
+        // Берём NFT из магазина
+        structNFTsInCollection[] storage col = colStore.NFTInCollection;
 
         uint256[] memory ids = new uint256[](col.length);
         uint256[] memory amounts = new uint256[](col.length);
@@ -369,10 +350,13 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         }
 
         // Перевод NFT с контракта покупателю
-        safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
+        _safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
 
-        // Передаём коллекцию покупателю
-        collectionNFTs[msg.sender][idCol] = myNewCollection;
+        // Передаём коллекцию покупателю, копируя структуру владельца
+        structCollectionNFT storage newCol = collectionNFTs[ownerCol][idCol];
+        collectionNFTs[msg.sender][idCol] = newCol;
+        collectionNFTs[msg.sender][idCol].state = false;      // больше не в магазине
+        collectionNFTs[msg.sender][idCol].existence = true;   // у нового владельца существует
 
         // Удаляем коллекцию у прошлого владельца
         delete collectionNFTs[ownerCol][idCol];
@@ -380,6 +364,7 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         // Удаляем коллекцию из магазина
         delete storeCollectionNFT[_index];
     }
+
 
     // Эта штука как то решает проблему с тем, что этот контракт не может принимать nft
     function supportsInterface(bytes4 interfaceId)
