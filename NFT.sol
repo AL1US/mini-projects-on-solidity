@@ -22,6 +22,9 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
 
     uint256 public constant INITIAL_SUPPLY = 1_000_000 * 10 ** 18; // количество всех токенов в системе
 
+    uint256 public indexNFTAuction;
+    uint256 public indexCollectionAuction;
+
     /*
     * STRUCT
     */
@@ -63,7 +66,7 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
     }
 
     /*
-    * structSTORE
+    * structSTORE and AUCTION
     */
 
     // Для того чтобы не засорять магазин ненужными данными, можно создать структуру только с теми данными
@@ -80,6 +83,33 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         uint256 id;
         address owner;
         structNFTsInCollection[] NFTInCollection;
+        uint256 price;
+    }
+
+    // Струкутры аукциона
+    struct structAuctionNFT {
+        uint256 id;
+        address ownerAuction;
+        uint256 idNFT;
+        uint256 amount;
+        uint256 timeStart;
+        uint256 timeEND;
+        uint256 minBet;
+    }
+
+    struct structAuctionCollection {
+        uint256 id;
+        address ownerAuction;
+        uint256 idCollection;
+        uint256 amount;
+        uint256 timeStart;
+        uint256 timeEND;
+        uint256 minBet;
+    }
+
+
+    struct structBet {
+        address owner;
         uint256 price;
     }
 
@@ -101,11 +131,18 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
     mapping(address => structUser) public user;
 
     /*
-    * mapping STORE
+    * mapping STORE and AUCTION
     */ 
 
     mapping(uint256 => structNFTsInStore) public storeNFT; // index => struct
     mapping(uint256 => structCollectionInStore) public storeCollectionNFT;
+
+    // аукцион со ставкой
+    mapping(uint256 => structAuctionNFT) public auctionNFT;
+    mapping(uint256 => structBet) public betNFT;
+
+    mapping(uint256 => structAuctionCollection) public auctionCollection;
+    mapping(uint256 => structBet) public betCollection;
 
 
     /*
@@ -133,6 +170,15 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
     // get col in store
     function getCollectionInStore(uint256 _index) public view returns (structCollectionInStore memory) {
         return storeCollectionNFT[_index];
+    }
+    // get auction NFT
+    function getAuctionNFT(uint256 _index) public view returns(structAuctionNFT memory) {
+        return auctionNFT[_index];
+    }
+
+    // get auction collection
+    function getAuctionCollection(uint256 _index) public view returns(structAuctionCollection memory) {
+        return auctionCollection[_index];
     }
     
     // Создать nft
@@ -365,6 +411,97 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         delete storeCollectionNFT[_index];
     }
 
+    /*
+    * SET AUCTION
+    */
+
+    function setAuctionNFT(uint256 _idNFT, uint256 _minBet, uint256 _endAuction, uint256 _amount) public {
+        require(NFT[msg.sender][_idNFT].amount >= _amount, "You don't have this NFT");
+        require(_amount > 0, "Amount must be > 0");
+        require(isApprovedForAll(msg.sender, address(this)), "Please approve the marketplace");
+
+        bytes memory data = "";
+
+        // Добавлем в мапинг
+        auctionNFT[indexNFTAuction] = structAuctionNFT(
+            indexNFTAuction,
+            msg.sender,
+            _idNFT,
+            _amount,
+            block.timestamp,
+            block.timestamp + _endAuction,
+            _minBet
+        );
+
+        // Переводим наши нфт контракту. Что-то типа листинга. Реализуется в main
+        safeTransferFrom(msg.sender, address(this), _idNFT, _amount, data);
+        // safeTransferFrom(from, to, id, value, data);
+
+        // вычитаем все добавленные nft
+        NFT[msg.sender][_idNFT].amount -= _amount;
+
+        // Если nft у юзера закончились, то мы удаляем их
+        if (NFT[msg.sender][_idNFT].amount == 0) {
+            delete NFT[msg.sender][_idNFT];
+        }
+
+        indexNFTAuction ++;
+
+    }
+
+    // Ставка аукциона по id                                               
+    function setBetNFT(uint256 _index, uint256 _betAmount) public payable {
+
+        structAuctionNFT storage auc = auctionNFT[_index];
+
+        require(auc.ownerAuction != address(0), "Auction does not exist");
+        require(block.timestamp < auc.timeEND, "Auction has ended");
+        require(msg.sender != auc.ownerAuction, "You cannot bid on your own auction");
+        require(_betAmount >= auc.minBet, "Bet is below min bet");
+        require(balanceOf(msg.sender) >= _betAmount, "Not enough Xcoin");
+
+        structBet storage bet = betNFT[_index];
+
+        // Ставка должна быть выше
+        require(_betAmount > bet.price, "Your bid must be higher than current bid");
+
+        // Возврат предыдущей ставки (если она была)
+        if (bet.price > 0) {
+            transfer(bet.owner, bet.price);
+        }
+
+        // Снимаем деньги с нового юзера
+        _transfer(msg.sender, address(this), _betAmount);
+
+        // Записываем новую ставку
+        betNFT[_index] = structBet(
+            msg.sender,
+            _betAmount
+        );
+    }
+
+    function finishAuctionNFT(uint256 _index) public {
+        structAuctionNFT storage auc = auctionNFT[_index];
+        structBet storage lastBet = betNFT[_index];
+
+        require(block.timestamp >= auc.timeEND, "Auction is not finished");
+        require(auc.ownerAuction != address(0), "Auction does not exist");
+
+        // Если ставок не было - возвращаем NFT владельцу
+        if (lastBet.price == 0) {
+            _safeTransferFrom(address(this), auc.ownerAuction, auc.idNFT, auc.amount, "");
+        } else {
+            // Покупатель получает NFT
+            _safeTransferFrom(address(this), lastBet.owner, auc.idNFT, auc.amount, "");
+
+            // Продавец получает деньги
+            transfer(auc.ownerAuction, lastBet.price);
+        }
+
+        // Чистим данные
+        delete auctionNFT[_index];
+        delete betNFT[_index];
+    }
 
     // Эта штука как то решает проблему с тем, что этот контракт не может принимать nft
     function supportsInterface(bytes4 interfaceId)
@@ -440,5 +577,7 @@ contract Xcoin is ERC20, ERC1155, ERC1155Holder{
         setNFTInStore(1, 5, 50); // id, amount, price
 
         setCollectionInStore(0, 15); // id коллекции, price
+
+        setAuctionNFT(3, 100, 10000, 4); // id, startPrice, timeEnd, amount
     }
 }
