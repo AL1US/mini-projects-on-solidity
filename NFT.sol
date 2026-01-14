@@ -77,6 +77,7 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
         address owner;
         uint256 amount;
         uint256 price;
+        uint256 indexInStore;
     }
 
     struct structCollectionInStore {
@@ -84,6 +85,7 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
         address owner;
         structNFTsInCollection[] NFTInCollection;
         uint256 price;
+        uint256 indexInStore;
     }
 
     // Струкутры аукциона
@@ -95,6 +97,7 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
         uint256 timeStart;
         uint256 timeEND;
         uint256 minBet;
+        uint256 indexInStore;
     }
 
     struct structAuctionCollection {
@@ -105,6 +108,7 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
         uint256 timeStart;
         uint256 timeEND;
         uint256 minBet;
+        uint256 indexInStore;
     }
 
 
@@ -433,7 +437,8 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
             _id,
             msg.sender,
             _amount,
-            _price
+            _price,
+            indexNFTInStore
         );
 
         // Переводим наши нфт контракту. Что-то типа листинга. Реализуется в main
@@ -514,6 +519,7 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
         s.id = _id;
         s.owner = msg.sender;
         s.price = _price;
+        s.indexInStore = unicueCollectionNFTInStore;
 
         for (uint256 i = 0; i < col.length; i++) {
             s.NFTInCollection.push(col[i]);
@@ -584,7 +590,8 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
             _amount,
             block.timestamp,
             block.timestamp + _endAuction,
-            _minBet
+            _minBet,
+            indexNFTAuction
         );
 
         // Переводим наши нфт контракту. Что-то типа листинга. Реализуется в main
@@ -729,48 +736,48 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
         user[owner] = structUser("Owner", "XCoinReferal31415", 0);
 
         // hardhat
-        user[0x70997970C51812dc3A010C7d01b50e0d17dc79C8] = structUser("Tom", "PROFI3C442024", 0);
-        ERC20._transfer(owner, 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, 200_000);
+        // user[0x70997970C51812dc3A010C7d01b50e0d17dc79C8] = structUser("Tom", "PROFI3C442024", 0);
+        // ERC20._transfer(owner, 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, 200_000);
 
-        user[0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC] = structUser("Max", "PROFI90F72024", 0);
-        ERC20._transfer(owner, 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 300_000);
+        // user[0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC] = structUser("Max", "PROFI90F72024", 0);
+        // ERC20._transfer(owner, 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 300_000);
 
-        user[0x90F79bf6EB2c4f870365E785982E1f101E93b906] = structUser("Jack", "PROFI15d32024", 0);
-        ERC20._transfer(owner, 0x90F79bf6EB2c4f870365E785982E1f101E93b906, 400_000);
+        // user[0x90F79bf6EB2c4f870365E785982E1f101E93b906] = structUser("Jack", "PROFI15d32024", 0);
+        // ERC20._transfer(owner, 0x90F79bf6EB2c4f870365E785982E1f101E93b906, 400_000);
 
         // remix
-        // user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser(
-        //     "Tom",
-        //     "PROFI4B202024",
-        //     0
-        // );
-        // ERC20._transfer(
-        //     owner,
-        //     0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2,
-        //     200_000
-        // );
+        user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser(
+            "Tom",
+            "PROFI4B202024",
+            0
+        );
+        ERC20._transfer(
+            owner,
+            0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2,
+            200_000
+        );
 
-        // user[0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db] = structUser(
-        //     "Max",
-        //     "PROFI78732024",
-        //     0
-        // );
-        // ERC20._transfer(
-        //     owner,
-        //     0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db,
-        //     300_000
-        // );
+        user[0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db] = structUser(
+            "Max",
+            "PROFI78732024",
+            0
+        );
+        ERC20._transfer(
+            owner,
+            0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db,
+            300_000
+        );
 
-        // user[0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB] = structUser(
-        //     "Jack",
-        //     "PROFI617F2024",
-        //     0
-        // );
-        // ERC20._transfer(
-        //     owner,
-        //     0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB,
-        //     400_000
-        // );
+        user[0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB] = structUser(
+            "Jack",
+            "PROFI617F2024",
+            0
+        );
+        ERC20._transfer(
+            owner,
+            0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB,
+            400_000
+        );
 
         setNFT("myNFT0", "desc", "imgPath", 10);
         setNFT("myNFT1", "desc", "imgPath", 10);
