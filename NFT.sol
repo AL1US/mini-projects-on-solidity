@@ -153,6 +153,11 @@ contract Contract is ERC20, ERC1155, ERC1155Holder{
     * GET
     */
 
+    function getBetNFT(uint256 _auctionIndex) public view returns (structBet memory) {
+        return betNFT[_auctionIndex];
+    }
+
+
     // получить информацию о моём профиле
     function getUser() public view returns(structUser memory) {
         return user[msg.sender];
