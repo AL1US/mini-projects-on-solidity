@@ -1,0 +1,271 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+
+contract Contract is ERC20, ERC1155 {
+
+    // SOMETHING
+
+    address public owner;
+
+    uint256 public unicueNFT;
+    uint256 public unicueColl;
+
+    uint256 public indexNFTInStore;
+
+
+    // STRUCT
+
+    struct structUser {
+        string nameUser;
+        string referalCode;
+        uint256 discont; // Процент скидки
+    }
+
+    struct structNFT {
+        uint256 id;
+        string name;
+        string description;
+        string imgPath;
+        uint256 amount; // Также выступает в роли проверки существования nft
+        uint256 creationDate;
+    }
+
+    struct structNFTInColl {
+        uint256 id;
+        uint256 amount;
+    }
+
+    struct structCollectionNFT {
+        uint256 id;
+        string name;
+        string description;
+        structNFTInColl[] NFTInColl;
+        bool state; // Нужно для того чтобы понять на аукционе она или нет
+        bool existence; // Нужно для проверки того, есть ли такая коллекция у юзера
+        uint256 creationDate;
+    }
+
+    struct structNFTsInStore {
+        uint256 id;
+        address owner;
+        uint256 amount;
+        uint256 price;
+        // uint256 indexInStore;
+    }
+
+
+    // MAPPING
+
+    mapping(address => structUser) public user;
+
+    mapping(uint256 => structNFT) public allNFTs;
+
+    mapping(address => mapping(uint256 => structNFT)) public userNFTs;
+
+    mapping(uint256 => structNFTsInStore) public storeNFT;
+
+    // MODOFIER
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "You are not a owner");
+        _;
+    }
+    
+    // GET
+
+    function getMyAllNFTs() public view returns(structNFT[] memory) {
+        uint256 count = 0;
+        
+        // Запоминаем сколько всего nft у юзера
+        for (uint256 i = 0; i < unicueNFT; i++) {
+            if (userNFTs[msg.sender][i].amount > 0) {
+                count++;
+            }
+        }
+        // Создаём массив с тем количеством ячеек сколько всего нфт у юзера, в который будем класть нфт
+        structNFT[] memory NFTs = new structNFT[](count);
+
+        // По этому индексу кладём в массив найденные нфт
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < unicueNFT; i++) {
+            if (userNFTs[msg.sender][i].amount > 0) {
+                NFTs[index] = userNFTs[msg.sender][i]; // Кладём нфт в массив, если они существуют
+                index++;
+            }
+        }
+
+        return NFTs;
+    }
+
+    function getAllStoreNFTs() public view returns (structNFTsInStore[] memory) {
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < indexNFTInStore; i++) {
+            if (storeNFT[i].amount > 0) {
+                count++;
+            }
+        }
+
+        structNFTsInStore[] memory result = new structNFTsInStore[](count);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < indexNFTInStore; i++) {
+            if (storeNFT[i].amount > 0) {
+                result[index] = storeNFT[i];
+                index++;
+            }
+        }
+
+        return result;
+    }
+
+    
+    // SET NFT
+
+    function setNFT(
+        string memory _name,
+        string memory _description,
+        string memory _imgPath,
+        uint256 _amount
+    ) public onlyOwner{
+
+        require(_amount > 0, "amount must be > 0");
+
+        _mint(msg.sender, unicueNFT, _amount, ""); // Создание nft в системе. Последний параметр принимает комментарий
+
+        // Добавление в мапинг юзера
+        userNFTs[msg.sender][unicueNFT] = structNFT(
+            unicueNFT,
+            _name,
+            _description,
+            _imgPath,
+            _amount,
+            block.timestamp
+        );
+
+        // Добавление в мапинг юзера
+        allNFTs[unicueNFT] = structNFT(
+            unicueNFT,
+            _name,
+            _description,
+            _imgPath,
+            _amount,
+            block.timestamp
+        );
+
+        unicueNFT++;
+    }
+
+    // SET STORE
+
+    function setNFTInStore(uint256 _id, uint256 _amount, uint256 _price) public  { 
+
+        uint256 userAmount = userNFTs[msg.sender][_id].amount;
+
+        require(_amount <= userAmount, "you don't have this nft");
+
+        storeNFT[indexNFTInStore] = structNFTsInStore(
+            _id,
+            msg.sender,
+            _amount,
+            _price // цена указывается за одну штуку
+        );
+
+
+        if (_amount == userAmount) {
+            delete userNFTs[msg.sender][_id];
+        } else {
+            userNFTs[msg.sender][_id].amount -= _amount;
+        }
+
+
+        indexNFTInStore++;
+        
+    }
+
+    function buyNFT(uint256 _index, uint256 _amount) public payable {
+
+        uint256 amountNFTInStore = storeNFT[_index].amount;
+        uint256 priceNFT = storeNFT[_index].price * _amount;
+        address ownerNFTInStore = storeNFT[_index].owner;
+        uint256 idNFT = storeNFT[_index].id;
+
+        uint256 balance = balanceOf(msg.sender);
+
+        require(_amount <= amountNFTInStore, "your amount is very big for this nft in store");
+        require(balance >= priceNFT, "you don't have enough PROFI for purchase this nft");
+
+        _transfer(msg.sender, ownerNFTInStore, priceNFT);
+
+        _safeTransferFrom(
+
+            ownerNFTInStore,
+            msg.sender,
+            idNFT,
+            _amount,
+            ""
+        );
+
+        if (amountNFTInStore == _amount) {
+            delete storeNFT[_index];
+        } else {
+            storeNFT[_index].amount -= _amount;
+        }
+
+        if (userNFTs[msg.sender][idNFT].amount > 0) {
+            userNFTs[msg.sender][idNFT].amount += _amount;
+        } else {
+            userNFTs[msg.sender][idNFT] = allNFTs[idNFT];
+            userNFTs[msg.sender][idNFT].amount = _amount;
+        } 
+
+    }
+
+    // SET COLLECTIONS
+
+    function setColl(string memory name, string memory desctiption) public {
+
+        
+    }
+    
+
+    // SET AUCTION
+
+    constructor() ERC20("Professional", "PROFI") ERC1155("./images/") {
+        // в папках проекта изменить параметр в функции decimals контракта ERC20 с 18и на 6 (так указано в тз)
+        owner = msg.sender;
+
+        user[owner] = structUser("owner", "PROFI70992024", 0);
+        ERC20._mint(owner, 1000000);
+
+        setNFT("myNFT0", "desc", "imgPath", 10);
+        setNFT("myNFT1", "desc", "imgPath", 10);
+        setNFT("myNFT2", "desc", "imgPath", 10);
+        setNFT("myNFT3", "desc", "imgPath", 10);
+
+
+        // user[0x70997970C51812dc3A010C7d01b50e0d17dc79C8] = structUser("Tom", "PROFI3C442024", 0);
+        // ERC20._transfer(owner, 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, 200000);
+
+        // user[0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC] = structUser("Max", "PROFI90F72024", 0);
+        // ERC20._transfer(owner, 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 300000);
+
+        // user[0x90F79bf6EB2c4f870365E785982E1f101E93b906] = structUser("Jack", "PROFI15d32024", 0);
+        // ERC20._transfer(owner, 0x90F79bf6EB2c4f870365E785982E1f101E93b906, 400000);
+
+        //remix
+        user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser("Tom", "PROFI4B202024", 0);
+        ERC20._transfer(owner, 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2, 200000);
+
+        user[0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db] = structUser("Max", "PROFI78732024", 0);
+        ERC20._transfer(owner, 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db, 300000);
+
+        user[0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB] = structUser("Jack", "PROFI617F2024", 0);
+        ERC20._transfer(owner, 0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB, 400000);
+    }
+
+}7u
