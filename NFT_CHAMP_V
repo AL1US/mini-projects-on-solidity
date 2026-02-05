@@ -8,29 +8,31 @@ contract Contract is ERC20, ERC1155 {
 
     // SOMETHING
 
-    address public owner;
+    address owner;
 
-    uint256 public unicueNFT;
-    uint256 public unicueColl;
+    uint256 unicueNFT;
+    uint256 unicueColl;
 
-    uint256 public indexNFTInStore;
-
+    uint256 indexNFTInStore;
+    uint256 indexCollInAuction;
 
     // STRUCT
 
     struct structUser {
-        string nameUser;
+        string name;
         string referalCode;
-        uint256 discont; // Процент скидки
+        uint256 discont;
     }
 
     struct structNFT {
         uint256 id;
         string name;
-        string description;
         string imgPath;
-        uint256 amount; // Также выступает в роли проверки существования nft
-        uint256 creationDate;
+        string description;
+        uint256 amount;
+        uint256 createDate;
+        bool inColl;
+        string nameColl;
     }
 
     struct structNFTInColl {
@@ -38,22 +40,35 @@ contract Contract is ERC20, ERC1155 {
         uint256 amount;
     }
 
-    struct structCollectionNFT {
+    struct structColl {
         uint256 id;
         string name;
         string description;
         structNFTInColl[] NFTInColl;
-        bool state; // Нужно для того чтобы понять на аукционе она или нет
-        bool existence; // Нужно для проверки того, есть ли такая коллекция у юзера
-        uint256 creationDate;
+        bool inAuction;
+        bool existe;
+        uint256 createDate;
     }
 
-    struct structNFTsInStore {
-        uint256 id;
+    struct structNFTInStore {
         address owner;
+        uint256 id;
         uint256 amount;
         uint256 price;
-        // uint256 indexInStore;
+    }
+
+    struct structAuction {
+        uint256 id;
+        uint256 idColl;
+        uint256 timeStart;
+        uint256 timeEnd;
+        uint256 minBet;
+        uint256 maxBet;
+    }
+
+    struct structBet {
+        address ownerBet;
+        uint256 priceBet;      
     }
 
 
@@ -61,39 +76,41 @@ contract Contract is ERC20, ERC1155 {
 
     mapping(address => structUser) public user;
 
-    mapping(uint256 => structNFT) public allNFTs;
+    mapping(address => mapping (uint256 => structNFT)) public userNFT;
+    mapping(address => mapping (uint256 => structColl)) public userColl;
 
-    mapping(address => mapping(uint256 => structNFT)) public userNFTs;
+    mapping(uint256 => structNFT) public allNFT;
 
-    mapping(uint256 => structNFTsInStore) public storeNFT;
+    mapping(uint256 => structNFTInStore) public storeNFT;
 
-    // MODOFIER
+    mapping(uint256 => structAuction) public auctionColl;
+    mapping(uint256 => structBet) public betAuction; // index auc => currentBet
+
+
+    // MODIFIER
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "You are not a owner");
+        require(msg.sender == owner, "You are not owner");
         _;
     }
-    
+
     // GET
 
-    function getMyAllNFTs() public view returns(structNFT[] memory) {
-        uint256 count = 0;
-        
-        // Запоминаем сколько всего nft у юзера
+    function getAllNFT() public view returns(structNFT[] memory) {
+        uint256 count;
+
         for (uint256 i = 0; i < unicueNFT; i++) {
-            if (userNFTs[msg.sender][i].amount > 0) {
+            if (userNFT[msg.sender][i].amount > 0) {
                 count++;
             }
         }
-        // Создаём массив с тем количеством ячеек сколько всего нфт у юзера, в который будем класть нфт
-        structNFT[] memory NFTs = new structNFT[](count);
 
-        // По этому индексу кладём в массив найденные нфт
-        uint256 index = 0;
+        structNFT[] memory NFTs = new structNFT[](count);
+        uint256 index;
 
         for (uint256 i = 0; i < unicueNFT; i++) {
-            if (userNFTs[msg.sender][i].amount > 0) {
-                NFTs[index] = userNFTs[msg.sender][i]; // Кладём нфт в массив, если они существуют
+            if (userNFT[msg.sender][i].amount > 0) {
+                NFTs[index] = userNFT[msg.sender][i];
                 index++;
             }
         }
@@ -101,8 +118,34 @@ contract Contract is ERC20, ERC1155 {
         return NFTs;
     }
 
-    function getAllStoreNFTs() public view returns (structNFTsInStore[] memory) {
-        uint256 count = 0;
+    function getAllColl() public view returns(structColl[] memory) {
+
+        uint256 count;
+
+        for (uint256 i = 0; i < unicueColl; i++) {
+            if (userColl[msg.sender][i].existe) {
+                count++;
+            }
+        }
+
+        structColl[] memory colls = new structColl[](count);
+        uint256 index;
+
+        for (uint256 i = 0; i < unicueColl; i++) {
+            if (userColl[msg.sender][i].existe) {
+                colls[index] = userColl[msg.sender][i];
+                index++;
+            }
+        }
+
+        return colls;
+
+    }
+
+
+    function getAllNFTInStore() public view returns(structNFTInStore[] memory) {
+
+        uint256 count;
 
         for (uint256 i = 0; i < indexNFTInStore; i++) {
             if (storeNFT[i].amount > 0) {
@@ -110,162 +153,255 @@ contract Contract is ERC20, ERC1155 {
             }
         }
 
-        structNFTsInStore[] memory result = new structNFTsInStore[](count);
-        uint256 index = 0;
+        structNFTInStore[] memory NFTs = new structNFTInStore[](count);
+        uint256 index;
 
         for (uint256 i = 0; i < indexNFTInStore; i++) {
             if (storeNFT[i].amount > 0) {
-                result[index] = storeNFT[i];
+                NFTs[index] = storeNFT[i];
                 index++;
             }
         }
 
-        return result;
+        return NFTs;
+
     }
 
-    
-    // SET NFT
 
+    function getAllAuctions() public view returns(structAuction[] memory) {
+
+        uint256 count;
+
+        for (uint256 i = 0; i < indexCollInAuction; i++) {
+            if (auctionColl[i].timeStart > 0) {
+                count++;
+            }
+        }
+
+        structAuction[] memory auctions = new structAuction[](count);
+        uint256 index;
+
+        for (uint256 i = 0; i < indexCollInAuction; i++) {
+            if (auctionColl[i].timeStart > 0) {
+                auctions[index] = auctionColl[i];
+                index++;
+            }
+        }
+
+        return auctions;
+
+    }
+
+    // SET
     function setNFT(
         string memory _name,
         string memory _description,
         string memory _imgPath,
         uint256 _amount
-    ) public onlyOwner{
+    ) public onlyOwner {
 
-        require(_amount > 0, "amount must be > 0");
+        require(_amount > 0, "amount can't be < 0" );
 
-        _mint(msg.sender, unicueNFT, _amount, ""); // Создание nft в системе. Последний параметр принимает комментарий
+        ERC1155._mint(msg.sender, unicueNFT, _amount, "");
 
-        // Добавление в мапинг юзера
-        userNFTs[msg.sender][unicueNFT] = structNFT(
+        userNFT[msg.sender][unicueNFT] = structNFT(
             unicueNFT,
             _name,
-            _description,
             _imgPath,
-            _amount,
-            block.timestamp
-        );
-
-        // Добавление в мапинг юзера
-        allNFTs[unicueNFT] = structNFT(
-            unicueNFT,
-            _name,
             _description,
-            _imgPath,
             _amount,
-            block.timestamp
-        );
-
-        unicueNFT++;
-    }
-
-    // SET STORE
-
-    function setNFTInStore(uint256 _id, uint256 _amount, uint256 _price) public  { 
-
-        uint256 userAmount = userNFTs[msg.sender][_id].amount;
-
-        require(_amount <= userAmount, "you don't have this nft");
-
-        storeNFT[indexNFTInStore] = structNFTsInStore(
-            _id,
-            msg.sender,
-            _amount,
-            _price // цена указывается за одну штуку
-        );
-
-
-        if (_amount == userAmount) {
-            delete userNFTs[msg.sender][_id];
-        } else {
-            userNFTs[msg.sender][_id].amount -= _amount;
-        }
-
-
-        indexNFTInStore++;
-        
-    }
-
-    function buyNFT(uint256 _index, uint256 _amount) public payable {
-
-        uint256 amountNFTInStore = storeNFT[_index].amount;
-        uint256 priceNFT = storeNFT[_index].price * _amount;
-        address ownerNFTInStore = storeNFT[_index].owner;
-        uint256 idNFT = storeNFT[_index].id;
-
-        uint256 balance = balanceOf(msg.sender);
-
-        require(_amount <= amountNFTInStore, "your amount is very big for this nft in store");
-        require(balance >= priceNFT, "you don't have enough PROFI for purchase this nft");
-
-        _transfer(msg.sender, ownerNFTInStore, priceNFT);
-
-        _safeTransferFrom(
-
-            ownerNFTInStore,
-            msg.sender,
-            idNFT,
-            _amount,
+            block.timestamp,
+            false,
             ""
         );
 
-        if (amountNFTInStore == _amount) {
+        
+        allNFT[unicueNFT] = structNFT(
+            unicueNFT,
+            _name,
+            _imgPath,
+            _description,
+            _amount,
+            block.timestamp,
+            false,
+            ""
+        );
+
+        unicueNFT++;
+
+    }
+
+    function setNFTInStore(uint256 _id, uint256 _amount, uint256 _price) public {
+        
+        uint256 userAmount = userNFT[msg.sender][_id].amount;
+
+        require(_amount <= userAmount, "you dont have enough amount nft");
+
+        // add in mapping
+        storeNFT[indexNFTInStore] = structNFTInStore (
+            msg.sender,
+            _id,
+            _amount,
+            _price
+        );
+
+        // delete in user
+        if (userAmount == _amount) {
+            delete userNFT[msg.sender][_id];
+        } else {
+            userNFT[msg.sender][_id].amount -= _amount;
+        }
+
+        indexNFTInStore++;
+    }
+
+    function buyNFT(uint256 _index, uint256 _amount) public payable {
+        
+        uint256 amountInStore = storeNFT[_index].amount;
+        address ownerNFT = storeNFT[_index].owner;
+        uint256 price = storeNFT[_index].price * _amount;
+        uint256 id = storeNFT[_index].id;
+
+        require(amountInStore >= _amount, "in store not enough amount nft");
+
+        _transfer(msg.sender, ownerNFT, price);
+
+        // add in mapping user
+        if (userNFT[msg.sender][id].amount > 0) {
+            userNFT[msg.sender][id].amount += _amount;
+        } else {
+            userNFT[msg.sender][id] = allNFT[id];
+            userNFT[msg.sender][id].amount = _amount;
+        }
+
+        // delete in store
+
+        if (amountInStore == _amount) {
             delete storeNFT[_index];
         } else {
             storeNFT[_index].amount -= _amount;
         }
 
-        if (userNFTs[msg.sender][idNFT].amount > 0) {
-            userNFTs[msg.sender][idNFT].amount += _amount;
-        } else {
-            userNFTs[msg.sender][idNFT] = allNFTs[idNFT];
-            userNFTs[msg.sender][idNFT].amount = _amount;
-        } 
+    }
+
+    function setColl(
+        string memory _name,
+        string memory  _description
+    ) public onlyOwner {
+
+        userColl[msg.sender][unicueColl] = structColl(
+            unicueColl,
+            _name,
+            _description,
+            new structNFTInColl[](0),
+            false,
+            true,
+            block.timestamp
+        );
+
+        unicueColl++;
+    }
+
+    function setNFTInColl(uint256 _idNFT, uint256 _idColl) public onlyOwner {
+
+        require(userColl[msg.sender][_idColl].existe, "you dont have this coll");
+        require(userColl[msg.sender][_idColl].inAuction == false, "this coll in auction");
+
+        uint256 amountNFT = userNFT[msg.sender][_idNFT].amount;
+
+        userColl[msg.sender][_idColl].NFTInColl.push(structNFTInColl(
+            _idNFT,
+            amountNFT
+        ));
+
+        userNFT[msg.sender][_idNFT].inColl = true;
+        userNFT[msg.sender][_idNFT].nameColl = userColl[msg.sender][_idColl].name;
 
     }
 
-    // SET COLLECTIONS
+    function setAuction(uint256 _idColl, uint256 _minBet, uint256 _maxBet, uint256 _timeEnd) public {
 
-    function setColl(string memory name, string memory desctiption) public {
+        require(userColl[msg.sender][_idColl].existe, "you dont have this coll");
+        require(userColl[msg.sender][_idColl].inAuction == false, "this coll in auction");
 
-        
+        auctionColl[indexCollInAuction] = structAuction(
+            indexCollInAuction,
+            _idColl,
+            block.timestamp,
+            block.timestamp + _timeEnd,
+            _minBet,
+            _maxBet
+        );
+
+        userColl[msg.sender][_idColl].inAuction == true;
+
+        indexCollInAuction++;
+
     }
+
+    // setBEt
+    function setBet(uint256 _indexAuction, uint256 _bet) public {
+
+        require(auctionColl[_indexAuction].timeStart > 0, " does not this auction");
+        require(balanceOf(msg.sender) >= _bet, "you dont have enough coin");
+        require(betAuction[_indexAuction].priceBet < _bet, "current bet > your bet");
+        require(auctionColl[_indexAuction].minBet <= _bet, " your bet < min bet");
+        require(auctionColl[_indexAuction].maxBet >= _bet, "your bet is very big");
+
+        betAuction[_indexAuction] = structBet(
+            msg.sender,
+            _bet
+        );
+    }
+
+    // endAuction
     
+    // function endAuction(uint256 _index) public onlyOwner payable {
+        
+    //     // transfer token ERC20. From / to / value
+    //     _transfer(betAuction[_index].ownerBet, owner, betAuction[_index].priceBet);
 
-    // SET AUCTION
+    //     // transfer NFT
+
+    //     // add nft in mapping and add coll
+
+    //     // delete auction from mapping
+    //     delete auctionColl[_index];
+
+    //     // delete collection from owner + delete him nft
+    //     delete 
+
+    // }
+
 
     constructor() ERC20("Professional", "PROFI") ERC1155("./images/") {
-        // в папках проекта изменить параметр в функции decimals контракта ERC20 с 18и на 6 (так указано в тз)
         owner = msg.sender;
 
-        user[owner] = structUser("owner", "PROFI70992024", 0);
-        ERC20._mint(owner, 1000000);
+        ERC20._mint(owner, 100_000 * 12);
+        user[msg.sender] = structUser("owner", "PROFI5B32026", 0);
 
-        setNFT("myNFT0", "desc", "imgPath", 10);
-        setNFT("myNFT1", "desc", "imgPath", 10);
-        setNFT("myNFT2", "desc", "imgPath", 10);
-        setNFT("myNFT3", "desc", "imgPath", 10);
+        setNFT("NFT0", "deskNFT0", "imgPath", 10);
+        setNFT("NFT01", "deskNFT01", "imgPath", 10);
+        setNFT("NFT02", "deskNFT02", "imgPath", 10);
+        setNFT("NFT03", "deskNFT03", "imgPath", 10);
 
+        setNFTInStore(0, 5, 100); // id, amount, price
+        setNFTInStore(1, 5, 228);
 
-        // user[0x70997970C51812dc3A010C7d01b50e0d17dc79C8] = structUser("Tom", "PROFI3C442024", 0);
-        // ERC20._transfer(owner, 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, 200000);
+        setColl("myColl0", "deskColl0");
+        setColl("myColl01", "deskColl01");
+        setColl("myColl02", "deskColl02");
 
-        // user[0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC] = structUser("Max", "PROFI90F72024", 0);
-        // ERC20._transfer(owner, 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 300000);
+        // remix
+        user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser("Tom", "PROFIAb82026", 0);
+        ERC20._mint(0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2, 200_000 * 12);
 
-        // user[0x90F79bf6EB2c4f870365E785982E1f101E93b906] = structUser("Jack", "PROFI15d32024", 0);
-        // ERC20._transfer(owner, 0x90F79bf6EB2c4f870365E785982E1f101E93b906, 400000);
+        user[0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db] = structUser("Max", "PROFI4B22026", 0);
+        ERC20._mint(0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db, 300_000 * 12);
 
-        //remix
-        user[0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2] = structUser("Tom", "PROFI4B202024", 0);
-        ERC20._transfer(owner, 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2, 200000);
+        user[0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB] = structUser("Jack", "PROFI7872026", 0);
+        ERC20._mint(0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB, 400_000 * 12);
 
-        user[0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db] = structUser("Max", "PROFI78732024", 0);
-        ERC20._transfer(owner, 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db, 300000);
-
-        user[0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB] = structUser("Jack", "PROFI617F2024", 0);
-        ERC20._transfer(owner, 0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB, 400000);
     }
 
-}7u
+}
